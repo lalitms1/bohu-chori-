@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Bohu Chori - Multiverse Village</title>
+    <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Baloo 2', cursive; background: #000; }
+        canvas { display: block; }
+        
+        #ui-layer {
+            position: absolute; top: 0; left: 0; width: 100%;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 10px 20px; box-sizing: border-box;
+            font-size: 24px; font-weight: bold; color: #fff;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8); pointer-events: none; z-index: 10;
+            display: none; /* Hidden until game starts */
+        }
+        #ui-layer span, #ui-layer button { pointer-events: auto; }
+        
+        button {
+            background-color: #e76f51; color: white; border: none;
+            padding: 10px 20px; font-size: 20px; font-family: 'Baloo 2', cursive;
+            border-radius: 8px; cursor: pointer; box-shadow: 0 4px #c44536; transition: 0.1s;
+            margin: 5px;
+        }
+        button:active { transform: translateY(4px); box-shadow: 0 0px #c44536; }
+        .btn-green { background-color: #2a9d8f; box-shadow: 0 4px #1f7a6f; }
+        .btn-green:active { box-shadow: 0 0px #1f7a6f; }
+        .btn-blue { background-color: #0077b6; box-shadow: 0 4px #005f8e; }
+        .btn-blue:active { box-shadow: 0 0px #005f8e; }
+
+        .overlay-card {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.95); padding: 30px 40px; border-radius: 20px;
+            text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            z-index: 20; border: 4px solid #2a9d8f; color: #264653; width: 80%; max-width: 500px;
+        }
+        #game-over { border-color: #e76f51; display: none; }
+        h1, h2 { color: #d90429; margin-top: 0; }
+        .theme-container { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <span id="lives-display">Lives: 3</span>
+        <span id="status-display">Tag the Bride!</span>
+        <span id="timer-display">Time: 60 (Day)</span>
+    </div>
+
+    <!-- MAIN MENU: Theme Selection -->
+    <div id="main-menu" class="overlay-card">
+        <h2>Bohu Chori 3D</h2>
+        <p>Select your environment:</p>
+        <div class="theme-container">
+            <button class="btn-green" onclick="startGame(1)">🌳 1. Jungle Village (Carts & Shops)</button>
+            <button class="btn-blue" onclick="startGame(2)">🌊 2. River & Boats</button>
+            <button onclick="startGame(3)">🚲 3. Street & Bicycles</button>
+        </div>
+    </div>
+
+    <!-- GAME OVER SCREEN -->
+    <div id="game-over" class="overlay-card">
+        <h1 id="end-title">Game Over!</h1>
+        <p id="end-desc">The Warriors caught you.</p>
+        <button onclick="document.getElementById('game-over').style.display='none'; document.getElementById('main-menu').style.display='block';">Main Menu</button>
+    </div>
+
+    <script>
+        // ==========================================
+        // 1. AUDIO ENGINE
+        // ==========================================
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+        function initAudio() {
+            if (!audioCtx) audioCtx = new AudioContext();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+        function playSound(type) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+            
+            if (type === 'hit') {
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, now);
+                osc.frequency.exponentialRampToValueAtTime(40, now + 0.3);
+                gain.gain.setValueAtTime(0.3, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                osc.start(now); osc.stop(now + 0.3);
+            } else if (type === 'rescue') {
+                osc.type = 'sine'; osc.frequency.setValueAtTime(400, now);
+                osc.frequency.setValueAtTime(800, now + 0.2);
+                gain.gain.setValueAtTime(0.3, now); gain.gain.linearRampToValueAtTime(0, now + 0.4);
+                osc.start(now); osc.stop(now + 0.4);
+            }
+        }
+
+        // ==========================================
+        // 2. THREE.JS ENGINE & LIGHTING
+        // ==========================================
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB);
+        scene.fog = new THREE.Fog(0x87CEEB, 20, 150);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xfffaed, 0.8);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 2048; sunLight.shadow.mapSize.height = 2048;
+        const d = 80;
+        sunLight.shadow.camera.left = -d; sunLight.shadow.camera.right = d;
+        sunLight.shadow.camera.top = d; sunLight.shadow.camera.bottom = -d;
+        scene.add(sunLight);
+
+        // ==========================================
+        // 3. PROCEDURAL BUILDERS & COLLISION ARRAY
+        // ==========================================
+        const villageSize = 120;
+        let obstacles =[]; // { x, z, radius, mesh }
+        let sceneryGroup = new THREE.Group();
+        scene.add(sceneryGroup);
+
+        const ground = new THREE.Mesh(new THREE.PlaneGeometry(villageSize, villageSize), new THREE.MeshStandardMaterial({ color: 0xe9c46a }));
+        ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true;
+        scene.add(ground);
+
+        // Reusable Geometries & Materials
+        const woodMat = new THREE.MeshStandardMaterial({ color: 0x5c4033 });
+        const leafMat = new THREE.MeshStandardMaterial({ color: 0x2a9d8f });
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0xf4a261 });
+        const roofMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b });
+        const wheelMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+
+        function addObstacle(mesh, x, z, radius) {
+            mesh.position.set(x, 0, z);
+            sceneryGroup.add(mesh);
+            obstacles.push({ x: x, z: z, radius: radius });
+        }
+
+        // --- Model Builders ---
+        function createHut() {
+            const group = new THREE.Group();
+            const hut = new THREE.Mesh(new THREE.BoxGeometry(8, 6, 8), wallMat); hut.position.y = 3; hut.castShadow = true;
+            const roof = new THREE.Mesh(new THREE.ConeGeometry(6, 5, 4), roofMat); roof.position.y = 8.5; roof.rotation.y = Math.PI/4; roof.castShadow = true;
+            group.add(hut, roof); return group;
+        }
+
+        function createTree() {
+            const group = new THREE.Group();
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 1, 6), woodMat); trunk.position.y = 3; trunk.castShadow = true;
+            const leaves = new THREE.Mesh(new THREE.SphereGeometry(4, 8, 8), leafMat); leaves.position.y = 7; leaves.castShadow = true;
+            group.add(trunk, leaves); return group;
+        }
+
+        function createBullockCart() {
+            const group = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.BoxGeometry(4, 1, 6), woodMat); body.position.y = 2.5; body.castShadow = true;
+            const wGeo = new THREE.CylinderGeometry(1.5, 1.5, 0.5, 16);
+            const w1 = new THREE.Mesh(wGeo, wheelMat); w1.rotation.z = Math.PI/2; w1.position.set(-2.5, 1.5, 0); w1.castShadow = true;
+            const w2 = new THREE.Mesh(wGeo, wheelMat); w2.rotation.z = Math.PI/2; w2.position.set(2.5, 1.5, 0); w2.castShadow = true;
+            const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 5), woodMat); pole.rotation.x = Math.PI/2; pole.position.set(0, 2.5, 4); pole.castShadow=true;
+            group.add(body, w1, w2, pole); return group;
+        }
+
+        function createShop() {
+            const group = new THREE.Group();
+            const base = new THREE.Mesh(new THREE.BoxGeometry(10, 4, 6), wallMat); base.position.y = 2; base.castShadow = true;
+            const counter = new THREE.Mesh(new THREE.BoxGeometry(10, 1, 2), new THREE.MeshStandardMaterial({color:0xd4a373})); counter.position.set(0, 2.5, 4); counter.castShadow=true;
+            const tent = new THREE.Mesh(new THREE.BoxGeometry(12, 1, 8), new THREE.MeshStandardMaterial({color:0xe76f51})); tent.position.set(0, 5, 2); tent.rotation.x=0.2; tent.castShadow=true;
+            group.add(base, counter, tent); return group;
+        }
+
+        function createBoat() {
+            const group = new THREE.Group();
+            const hull = new THREE.Mesh(new THREE.BoxGeometry(4, 2, 10), woodMat); hull.position.y = 0.5; hull.castShadow = true;
+            const seat = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.5, 2), wallMat); seat.position.y = 1.5; seat.castShadow=true;
+            group.add(hull, seat); return group;
+        }
+
+        function createBicycle() {
+            const group = new THREE.Group();
+            const wGeo = new THREE.TorusGeometry(1, 0.1, 8, 16);
+            const w1 = new THREE.Mesh(wGeo, wheelMat); w1.position.set(0, 1, -2); w1.castShadow=true;
+            const w2 = new THREE.Mesh(wGeo, wheelMat); w2.position.set(0, 1, 2); w2.castShadow=true;
+            const frame = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 4), new THREE.MeshStandardMaterial({color:0xd90429})); frame.position.set(0, 1.5, 0); frame.castShadow=true;
+            const handlebars = new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.1, 2), wheelMat); handlebars.rotation.z = Math.PI/2; handlebars.position.set(0, 2.5, 2); handlebars.castShadow=true;
+            group.add(w1, w2, frame, handlebars); group.rotation.y = Math.random() * Math.PI; return group;
+        }
+
+        // ==========================================
+        // 4. THEME GENERATION LOGIC
+        // ==========================================
+        function loadTheme(themeId) {
+            // Clear old theme
+            for(let i=sceneryGroup.children.length-1; i>=0; i--) sceneryGroup.remove(sceneryGroup.children[i]);
+            obstacles =[];
+
+            if (themeId === 1) {
+                // Theme 1: Jungle & Village
+                ground.material.color.setHex(0xe9c46a); // Dusty yellow
+                for (let i = 0; i < 35; i++) {
+                    let x = (Math.random() - 0.5) * 100; let z = (Math.random() - 0.5) * 100;
+                    if (Math.abs(x) < 15) x += (x > 0 ? 15 : -15); // Clear center lane
+                    
+                    let type = Math.random();
+                    if (type < 0.4) addObstacle(createTree(), x, z, 2);
+                    else if (type < 0.7) addObstacle(createHut(), x, z, 5);
+                    else if (type < 0.85) addObstacle(createShop(), x, z, 6);
+                    else addObstacle(createBullockCart(), x, z, 4);
+                }
+            } 
+            else if (themeId === 2) {
+                // Theme 2: River & Boats
+                ground.material.color.setHex(0x7cb342); // Grass green
+                
+                // The River (Visual)
+                const river = new THREE.Mesh(new THREE.PlaneGeometry(villageSize, 20), new THREE.MeshStandardMaterial({ color: 0x4fc3f7, transparent: true, opacity:0.8 }));
+                river.rotation.x = -Math.PI / 2; river.position.y = 0.2;
+                sceneryGroup.add(river);
+
+                // Add obstacles around river
+                for (let i = 0; i < 20; i++) {
+                    let x = (Math.random() - 0.5) * 100; let z = (Math.random() - 0.5) * 100;
+                    if (Math.abs(z) < 15) continue; // Keep out of river
+                    addObstacle(Math.random() > 0.5 ? createTree() : createHut(), x, z, Math.random()>0.5? 2:5);
+                }
+                // Add Boats IN the river as physical obstacles
+                for (let i = 0; i < 4; i++) {
+                    addObstacle(createBoat(), (Math.random() - 0.5) * 80, (Math.random() - 0.5) * 10, 5);
+                }
+            }
+            else if (themeId === 3) {
+                // Theme 3: Street & Bicycles
+                ground.material.color.setHex(0x9e9e9e); // Concrete Grey
+                for (let i = 0; i < 40; i++) {
+                    let x = (Math.random() - 0.5) * 100; let z = (Math.random() - 0.5) * 100;
+                    if (Math.abs(x) < 10) x += (x > 0 ? 10 : -10); // Clear road
+                    
+                    let type = Math.random();
+                    if (type < 0.5) addObstacle(createShop(), x, z, 6); // More shops/buildings
+                    else if (type < 0.8) addObstacle(createTree(), x, z, 2);
+                    else addObstacle(createBicycle(), x, z, 2.5);
+                }
+            }
+        }
+
+        // ==========================================
+        // 5. CHARACTERS & COLLISION PHYSICS
+        // ==========================================
+        function createCharacter(bodyColor, headColor, hasStick = false) {
+            const group = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.CylinderGeometry(1, 1.5, 3), new THREE.MeshStandardMaterial({ color: bodyColor })); body.position.y = 1.5; body.castShadow = true;
+            const head = new THREE.Mesh(new THREE.SphereGeometry(1.2), new THREE.MeshStandardMaterial({ color: headColor })); head.position.y = 3.7; head.castShadow = true;
+            group.add(body, head);
+            if (hasStick) {
+                const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 5), woodMat);
+                stick.position.set(1.5, 2.5, 1); stick.rotation.x = Math.PI / 4; stick.castShadow = true; group.add(stick);
+            }
+            return group;
+        }
+
+        let playerMesh = createCharacter(0x0077b6, 0xf5cab3); scene.add(playerMesh);
+        let brideMesh = createCharacter(0xd90429, 0xf5cab3); scene.add(brideMesh);
+        let enemies =[];
+
+        function spawnEnemies(count) {
+            enemies.forEach(e => scene.remove(e.mesh));
+            enemies =[];
+            for (let i = 0; i < count; i++) {
+                let mesh = createCharacter(0x264653, 0xe76f51, true);
+                mesh.position.set((Math.random() - 0.5) * 40, 0, (Math.random() - 0.5) * 40);
+                scene.add(mesh);
+                enemies.push({ mesh: mesh, speed: 10 });
+            }
+        }
+
+        // --- Custom Physics Engine ---
+        function checkCollision(targetX, targetZ, radius) {
+            // Check boundaries
+            if (Math.abs(targetX) > villageSize/2 || Math.abs(targetZ) > villageSize/2) return true;
+            // Check obstacles (Circle-based collision)
+            for (let obs of obstacles) {
+                let dx = targetX - obs.x;
+                let dz = targetZ - obs.z;
+                if (Math.sqrt(dx*dx + dz*dz) < (radius + obs.radius)) return true;
+            }
+            return false;
+        }
+
+        // ==========================================
+        // 6. GAME LOGIC & CONTROLS
+        // ==========================================
+        let isPlaying = false;
+        let lives = 3; let timeLeft = 60; let hasBohu = false;
+        const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
+        
+        window.addEventListener("keydown", (e) => { if(keys.hasOwnProperty(e.key)) keys[e.key] = true; });
+        window.addEventListener("keyup", (e) => { if(keys.hasOwnProperty(e.key)) keys[e.key] = false; });
+
+        function startGame(themeId) {
+            initAudio();
+            document.getElementById("main-menu").style.display = "none";
+            document.getElementById("ui-layer").style.display = "flex";
+            
+            loadTheme(themeId);
+            
+            playerMesh.position.set(0, 0, villageSize/2 - 5);
+            brideMesh.position.set(0, 0, -villageSize/2 + 5);
+            brideMesh.visible = true; hasBohu = false;
+            
+            if(playerMesh.getObjectByName("brideIcon")) playerMesh.remove(playerMesh.getObjectByName("brideIcon"));
+
+            lives = 3; timeLeft = 60; spawnEnemies(4);
+            sunLight.position.set(50, 100, 20); 
+            scene.fog.color.setHex(0x87CEEB); scene.background.setHex(0x87CEEB);
+
+            updateUI();
+            isPlaying = true;
+        }
+
+        function updateUI() {
+            document.getElementById("lives-display").innerText = `Lives: ${lives}`;
+            document.getElementById("timer-display").innerText = `Time: ${timeLeft}`;
+        }
+
+        setInterval(() => {
+            if (isPlaying && timeLeft > 0) {
+                timeLeft--; updateUI();
+                if (timeLeft <= 0) { isPlaying = false; showGameOver(false); }
+            }
+        }, 1000);
+
+        function showGameOver(win) {
+            document.getElementById("ui-layer").style.display = "none";
+            document.getElementById("game-over").style.display = "block";
+            document.getElementById("end-title").innerText = win ? "Victory!" : "Game Over!";
+            document.getElementById("end-title").style.color = win ? "#2a9d8f" : "#e76f51";
+            document.getElementById("end-desc").innerText = win ? "You rescued the Bride!" : "Caught by the Warriors!";
+        }
+
+        // ==========================================
+        // 7. MAIN GAME LOOP
+        // ==========================================
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = Math.min(clock.getDelta(), 0.1); // Cap delta time
+
+            if (isPlaying) {
+                // --- Day/Night 4D Logic ---
+                const sunProgress = 1 - (timeLeft / 60); 
+                sunLight.position.y = 100 - (sunProgress * 120); 
+                sunLight.intensity = Math.max(0.1, 0.8 - sunProgress * 0.7);
+                if (sunProgress > 0.5 && sunProgress < 0.8) {
+                    scene.background.lerp(new THREE.Color(0xf4a261), 0.01); scene.fog.color.lerp(new THREE.Color(0xf4a261), 0.01);
+                } else if (sunProgress >= 0.8) {
+                    scene.background.lerp(new THREE.Color(0x2b2d42), 0.01); scene.fog.color.lerp(new THREE.Color(0x2b2d42), 0.01);
+                }
+
+                // --- Player Movement with Collision Sliding ---
+                const moveSpeed = 20 * dt;
+                let moveX = 0, moveZ = 0;
+                if (keys.w || keys.ArrowUp) moveZ -= moveSpeed;
+                if (keys.s || keys.ArrowDown) moveZ += moveSpeed;
+                if (keys.a || keys.ArrowLeft) moveX -= moveSpeed;
+                if (keys.d || keys.ArrowRight) moveX += moveSpeed;
+
+                // Move X axis independently (Slide against walls)
+                if (moveX !== 0 && !checkCollision(playerMesh.position.x + moveX, playerMesh.position.z, 1.5)) {
+                    playerMesh.position.x += moveX;
+                }
+                // Move Z axis independently (Slide against walls)
+                if (moveZ !== 0 && !checkCollision(playerMesh.position.x, playerMesh.position.z + moveZ, 1.5)) {
+                    playerMesh.position.z += moveZ;
+                }
+
+                playerMesh.position.y = Math.abs(Math.sin(clock.elapsedTime * 15)) * 0.5; // Running Bob
+
+                // --- Camera Follow ---
+                camera.position.lerp(new THREE.Vector3(playerMesh.position.x, 25, playerMesh.position.z + 30), 0.1);
+                camera.lookAt(playerMesh.position);
+
+                // --- Enemy AI (Seek & Avoid Obstacles) ---
+                enemies.forEach(enemy => {
+                    let dx = playerMesh.position.x - enemy.mesh.position.x;
+                    let dz = playerMesh.position.z - enemy.mesh.position.z;
+                    let dist = Math.sqrt(dx*dx + dz*dz);
+                    
+                    if (dist > 0) {
+                        let eMoveX = (dx/dist) * enemy.speed * dt;
+                        let eMoveZ = (dz/dist) * enemy.speed * dt;
+
+                        // Enemies also respect collision! (They slide against walls)
+                        if (!checkCollision(enemy.mesh.position.x + eMoveX, enemy.mesh.position.z, 1.5)) enemy.mesh.position.x += eMoveX;
+                        if (!checkCollision(enemy.mesh.position.x, enemy.mesh.position.z + eMoveZ, 1.5)) enemy.mesh.position.z += eMoveZ;
+                        enemy.mesh.lookAt(playerMesh.position);
+                    }
+
+                    // Catching Player
+                    if (dist < 3) {
+                        playSound('hit'); lives--; updateUI();
+                        if (lives <= 0) { isPlaying = false; showGameOver(false); } 
+                        else {
+                            playerMesh.position.set(0, 0, villageSize/2 - 5);
+                            enemy.mesh.position.set((Math.random() - 0.5) * 40, 0, 0);
+                        }
+                    }
+                });
+
+                // --- Gameplay Logic ---
+                if (!hasBohu && playerMesh.position.distanceTo(brideMesh.position) < 4) {
+                    hasBohu = true; brideMesh.visible = false; playSound('rescue');
+                    document.getElementById("status-display").innerText = "Run to the start!";
+                    const icon = new THREE.Mesh(new THREE.SphereGeometry(1), new THREE.MeshStandardMaterial({color: 0xd90429}));
+                    icon.position.set(2, 3, 0); icon.name = "brideIcon"; playerMesh.add(icon);
+                }
+
+                if (hasBohu && playerMesh.position.z > (villageSize/2 - 20)) {
+                    isPlaying = false; showGameOver(true);
+                }
+            }
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
