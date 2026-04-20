@@ -7,41 +7,34 @@
     <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
-        body { 
-            margin: 0; 
-            overflow: hidden; 
-            font-family: 'Baloo 2', cursive; 
-            background: #000; 
-            /* Crucial for mobile games: prevents pull-to-refresh and swipe navigation */
-            touch-action: none; 
-            -webkit-user-select: none; 
-            user-select: none; 
-        }
+        body { margin: 0; overflow: hidden; font-family: 'Baloo 2', cursive; background: #000; touch-action: none; user-select: none; }
         canvas { display: block; }
         
-        /* Top UI */
         #ui-layer {
-            position: absolute; top: 0; left: 0; width: 100%;
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 10px 20px; box-sizing: border-box;
-            font-size: 24px; font-weight: bold; color: #fff;
+            position: absolute; top: 0; left: 0; width: 100%; display: flex; justify-content: space-between; align-items: center;
+            padding: 10px 20px; box-sizing: border-box; font-size: 24px; font-weight: bold; color: #fff;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.9); pointer-events: none; z-index: 10; display: none;
         }
 
-        /* Persistent In-Game Instructions */
+        #stamina-container {
+            position: absolute; top: 50px; left: 50%; transform: translateX(-50%);
+            width: 200px; height: 10px; background: rgba(255,255,255,0.3);
+            border-radius: 5px; border: 2px solid #fff; display: none; z-index: 10;
+        }
+        #stamina-fill { width: 100%; height: 100%; background: #00e5ff; border-radius: 3px; transition: width 0.1s linear; }
+
         #ingame-instructions {
             position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.6); padding: 10px 20px; border-radius: 30px;
-            color: #fff; font-size: 16px; text-align: center; border: 2px solid #2a9d8f;
+            background: rgba(0, 0, 0, 0.7); padding: 10px 20px; border-radius: 30px;
+            color: #fff; font-size: 16px; text-align: center; border: 2px solid #00e5ff;
             text-shadow: 1px 1px 2px #000; pointer-events: none; z-index: 10; display: none; width: 90%; max-width: 600px;
         }
         
-        /* Modals & Buttons */
         .overlay-card {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(255, 255, 255, 0.95); padding: 30px 40px; border-radius: 20px;
+            background: rgba(255, 250, 240, 0.95); padding: 30px 40px; border-radius: 20px;
             text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.6); z-index: 20;
-            border: 4px solid #2a9d8f; color: #264653; width: 85%; max-width: 500px;
+            border: 4px solid #e76f51; color: #264653; width: 85%; max-width: 500px;
         }
         button {
             background-color: #e76f51; color: white; border: none; padding: 12px 20px;
@@ -53,7 +46,6 @@
         .btn-blue { background-color: #0077b6; box-shadow: 0 4px #005f8e; }
         h1, h2 { color: #d90429; margin-top: 0; }
         
-        /* Virtual Joystick */
         #joystick-container {
             position: absolute; bottom: 50px; left: 30px; width: 120px; height: 120px;
             background: rgba(255,255,255,0.2); border: 2px solid rgba(255,255,255,0.5);
@@ -61,11 +53,17 @@
         }
         #joystick-knob {
             position: absolute; top: 30px; left: 30px; width: 60px; height: 60px;
-            background: rgba(231, 111, 81, 0.8); border-radius: 50%; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-            pointer-events: none; /* Let container handle events */
+            background: rgba(0, 229, 255, 0.8); border-radius: 50%; box-shadow: 0 4px 10px rgba(0,0,0,0.5); pointer-events: none;
         }
 
-        /* 3D Speech Bubbles */
+        #dash-btn {
+            position: absolute; bottom: 60px; right: 40px; width: 80px; height: 80px;
+            background: rgba(0, 229, 255, 0.8); border: 3px solid #fff; border-radius: 50%;
+            color: #fff; font-weight: bold; font-size: 18px; display: none;
+            justify-content: center; align-items: center; z-index: 15; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+        #dash-btn:active { transform: scale(0.95); }
+
         .speech-bubble {
             position: absolute; background: white; border: 2px solid #264653; border-radius: 15px;
             padding: 5px 10px; font-size: 14px; font-weight: bold; color: #264653;
@@ -82,490 +80,368 @@
 
     <div id="ui-layer">
         <span id="lives-display">Lives: 3</span>
-        <span id="status-display">Tag the Bride!</span>
+        <span id="status-display">Tag the Bohu!</span>
         <span id="timer-display">Time: 180</span>
     </div>
+    <div id="stamina-container"><div id="stamina-fill"></div></div>
 
     <div id="ingame-instructions">
-        🎮 <b>PC:</b> WASD/Arrows | 📱 <b>Mobile:</b> Use the Joystick<br>
-        🚲 <b>Bikes:</b> Fast on land! | 🛶 <b>Boats:</b> Cross rivers safely!
+        🎮 <b>PC:</b> WASD + SHIFT to Dash | 📱 <b>Mobile:</b> Joystick + Dash<br>
+        <i>Look for the Green Ring to track your character!</i>
     </div>
 
-    <div id="joystick-container">
-        <div id="joystick-knob"></div>
-    </div>
+    <div id="joystick-container"><div id="joystick-knob"></div></div>
+    <div id="dash-btn">DASH</div>
 
     <div id="main-menu" class="overlay-card">
         <h2>Bohu Chori 3D</h2>
-        <p>Select your environment:</p>
-        <button class="btn-green" onclick="startGame(1)">🌳 1. Jungle Village</button>
-        <button class="btn-blue" onclick="startGame(2)">🌊 2. River & Boats</button>
+        <p>A Traditional Chase</p>
+        <button class="btn-green" onclick="startGame(1)">🌳 1. Village (Laterite Ground)</button>
+        <button class="btn-blue" onclick="startGame(2)">🌊 2. River Crossing</button>
         <button onclick="startGame(3)">🚲 3. Street Chase</button>
     </div>
 
     <div id="game-over" class="overlay-card" style="display:none;">
         <h1 id="end-title">Game Over!</h1>
-        <p id="end-desc">The Warriors caught you.</p>
+        <p id="end-desc"></p>
         <button onclick="document.getElementById('game-over').style.display='none'; document.getElementById('main-menu').style.display='block';">Main Menu</button>
     </div>
 
     <script>
-        // ==========================================
-        // 1. IMPROVED MOBILE JOYSTICK & INPUT
-        // ==========================================
-        let joyX = 0, joyZ = 0;
-        const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
+        // ================== INPUT & MOBILE ==================
+        let joyX = 0, joyZ = 0; let isDashing = false;
+        const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false, Shift: false };
         
         window.addEventListener("keydown", (e) => { if(keys.hasOwnProperty(e.key)) keys[e.key] = true; });
         window.addEventListener("keyup", (e) => { if(keys.hasOwnProperty(e.key)) keys[e.key] = false; });
 
         const joyZone = document.getElementById("joystick-container");
         const joyKnob = document.getElementById("joystick-knob");
+        const dashBtn = document.getElementById("dash-btn");
         let dragging = false;
-
-        // Check if device is likely mobile
         const isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (window.innerWidth <= 768);
 
         function handleTouch(e) {
-            e.preventDefault(); // Prevent scrolling
-            const touch = e.touches[0] || e.changedTouches[0];
+            e.preventDefault(); const touch = e.touches[0] || e.changedTouches[0];
             const rect = joyZone.getBoundingClientRect();
-            const centerX = rect.left + rect.width / 2;
-            const centerY = rect.top + rect.height / 2;
-            let dx = touch.clientX - centerX;
-            let dy = touch.clientY - centerY;
-            const distance = Math.min(Math.sqrt(dx*dx + dy*dy), 30);
+            let dx = touch.clientX - (rect.left + rect.width / 2);
+            let dy = touch.clientY - (rect.top + rect.height / 2);
+            const dist = Math.min(Math.sqrt(dx*dx + dy*dy), 30);
             const angle = Math.atan2(dy, dx);
-            
-            joyX = (distance / 30) * Math.cos(angle);
-            joyZ = (distance / 30) * Math.sin(angle);
-            
-            joyKnob.style.transform = `translate(${Math.cos(angle) * distance}px, ${Math.sin(angle) * distance}px)`;
+            joyX = (dist / 30) * Math.cos(angle); joyZ = (dist / 30) * Math.sin(angle);
+            joyKnob.style.transform = `translate(${Math.cos(angle) * dist}px, ${Math.sin(angle) * dist}px)`;
         }
 
         joyZone.addEventListener("touchstart", (e) => { dragging = true; handleTouch(e); }, {passive: false});
         joyZone.addEventListener("touchmove", (e) => { if(dragging) handleTouch(e); }, {passive: false});
-        joyZone.addEventListener("touchend", (e) => { 
-            e.preventDefault(); 
-            dragging = false; joyX = 0; joyZ = 0; 
-            joyKnob.style.transform = `translate(0px, 0px)`; 
-        }, {passive: false});
+        joyZone.addEventListener("touchend", (e) => { e.preventDefault(); dragging = false; joyX = joyZ = 0; joyKnob.style.transform = `translate(0px, 0px)`; }, {passive: false});
+        dashBtn.addEventListener("touchstart", (e) => { e.preventDefault(); isDashing = true; }, {passive: false});
+        dashBtn.addEventListener("touchend", (e) => { e.preventDefault(); isDashing = false; }, {passive: false});
 
-        // ==========================================
-        // 2. AUDIO & THREE.JS ENGINE SETUP
-        // ==========================================
+        // ================== ENGINE SETUP ==================
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87CEEB);
-        scene.fog = new THREE.Fog(0x87CEEB, 20, 150);
-
+        scene.background = new THREE.Color(0x87CEEB); scene.fog = new THREE.Fog(0x87CEEB, 20, 150);
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.setSize(window.innerWidth, window.innerHeight); renderer.shadowMap.enabled = true;
         document.body.appendChild(renderer.domElement);
+        scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+        const sunLight = new THREE.DirectionalLight(0xfffaed, 0.8); sunLight.castShadow = true;
+        sunLight.position.set(50, 100, 50); scene.add(sunLight);
 
-        scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-        const sunLight = new THREE.DirectionalLight(0xfffaed, 0.8);
-        sunLight.castShadow = true;
-        sunLight.shadow.mapSize.width = 1024; sunLight.shadow.mapSize.height = 1024;
-        sunLight.shadow.camera.left = -80; sunLight.shadow.camera.right = 80;
-        sunLight.shadow.camera.top = 80; sunLight.shadow.camera.bottom = -80;
-        scene.add(sunLight);
-
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        let audioCtx;
-        function playSound(type) {
-            if (!audioCtx) { audioCtx = new AudioContext(); audioCtx.resume(); }
-            const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
-            osc.connect(gain); gain.connect(audioCtx.destination);
-            const now = audioCtx.currentTime;
-            
-            if (type === 'hit') {
-                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, now); osc.frequency.exponentialRampToValueAtTime(40, now+0.3);
-                gain.gain.setValueAtTime(0.3, now); gain.gain.exponentialRampToValueAtTime(0.01, now+0.3); osc.start(now); osc.stop(now+0.3);
-            } else if (type === 'pickup') {
-                osc.type = 'square'; osc.frequency.setValueAtTime(600, now); osc.frequency.setValueAtTime(900, now+0.1);
-                gain.gain.setValueAtTime(0.2, now); gain.gain.linearRampToValueAtTime(0, now+0.2); osc.start(now); osc.stop(now+0.2);
-            }
+        let particles = [];
+        const particleGeo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+        const particleMat = new THREE.MeshBasicMaterial({color: 0xdddddd, transparent: true, opacity: 0.8});
+        function spawnDust(x, y, z) {
+            const p = new THREE.Mesh(particleGeo, particleMat);
+            p.position.set(x + (Math.random()-0.5), y, z + (Math.random()-0.5));
+            p.userData = { life: 1.0 }; scene.add(p); particles.push(p);
         }
 
-        // ==========================================
-        // 3. BUILDERS, COLLISIONS & THEMES
-        // ==========================================
-        const villageSize = 140;
-        let currentTheme = 1;
-        let obstacles =[]; 
-        let vehicles =[]; 
-        let riverFoam =[]; 
-
+        // ================== BUILDERS & THEMES ==================
+        const villageSize = 140; let currentTheme = 1; let obstacles =[]; let vehicles =[];
         let sceneryGroup = new THREE.Group(); scene.add(sceneryGroup);
-        const ground = new THREE.Mesh(new THREE.PlaneGeometry(villageSize, villageSize), new THREE.MeshStandardMaterial({ color: 0xe9c46a }));
+        const ground = new THREE.Mesh(new THREE.PlaneGeometry(villageSize, villageSize), new THREE.MeshStandardMaterial({ color: 0xba6340 })); 
         ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
 
         function createModel(type) {
             const group = new THREE.Group();
-            if (type === 'tree') {
-                const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 1, 6), new THREE.MeshStandardMaterial({color: 0x5c4033})); trunk.position.y = 3; trunk.castShadow=true;
-                const leaves = new THREE.Mesh(new THREE.SphereGeometry(4, 8, 8), new THREE.MeshStandardMaterial({color: 0x2a9d8f})); leaves.position.y = 7; leaves.castShadow=true;
-                group.add(trunk, leaves);
-            } else if (type === 'hut') {
-                const hut = new THREE.Mesh(new THREE.BoxGeometry(8, 6, 8), new THREE.MeshStandardMaterial({color: 0xf4a261})); hut.position.y = 3; hut.castShadow=true;
-                const roof = new THREE.Mesh(new THREE.ConeGeometry(6, 5, 4), new THREE.MeshStandardMaterial({color: 0x8b5a2b})); roof.position.y=8.5; roof.rotation.y=Math.PI/4; roof.castShadow=true;
+            if (type === 'hut') {
+                const hut = new THREE.Mesh(new THREE.BoxGeometry(8, 6, 8), new THREE.MeshStandardMaterial({color: 0xd4a373})); 
+                hut.position.y = 3; hut.castShadow=true;
+                const roof = new THREE.Mesh(new THREE.ConeGeometry(6, 5, 4), new THREE.MeshStandardMaterial({color: 0xe9c46a})); 
+                roof.position.y=8.5; roof.rotation.y=Math.PI/4; roof.castShadow=true;
                 group.add(hut, roof);
+            } else if (type === 'tree') {
+                const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 1, 6), new THREE.MeshStandardMaterial({color: 0x5c4033})); trunk.position.y = 3; trunk.castShadow=true;
+                const leaves = new THREE.Mesh(new THREE.SphereGeometry(4, 8, 8), new THREE.MeshStandardMaterial({color: 0x386641})); leaves.position.y = 7; leaves.castShadow=true;
+                group.add(trunk, leaves);
             } else if (type === 'bike') {
                 const wGeo = new THREE.TorusGeometry(1, 0.1, 8, 16); const wMat = new THREE.MeshStandardMaterial({color:0x333});
                 const w1 = new THREE.Mesh(wGeo, wMat); w1.position.set(0, 1, -2); w1.castShadow=true;
                 const w2 = new THREE.Mesh(wGeo, wMat); w2.position.set(0, 1, 2); w2.castShadow=true;
-                const frame = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 4), new THREE.MeshStandardMaterial({color:0xd90429})); frame.position.set(0, 1.5, 0); frame.castShadow=true;
+                const frame = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 4), new THREE.MeshStandardMaterial({color:0x2a9d8f})); frame.position.set(0, 1.5, 0); frame.castShadow=true;
                 group.add(w1, w2, frame); group.scale.set(0.8,0.8,0.8);
             } else if (type === 'boat') {
-                const hull = new THREE.Mesh(new THREE.BoxGeometry(4, 2, 8), new THREE.MeshStandardMaterial({color: 0x5c4033})); hull.position.y=1; hull.castShadow=true;
+                const hull = new THREE.Mesh(new THREE.BoxGeometry(5, 1.5, 9), new THREE.MeshStandardMaterial({color: 0x6f4e37})); hull.position.y=0.5; hull.castShadow=true;
                 group.add(hull); group.scale.set(0.9,0.9,0.9);
             }
             return group;
         }
 
         function loadTheme(themeId) {
-            currentTheme = themeId;
-            sceneryGroup.clear(); obstacles =[]; vehicles =[]; riverFoam =[];
-
-            if (themeId === 1) { // Jungle
-                ground.material.color.setHex(0xe9c46a);
-                for (let i=0; i<40; i++) spawnStatic(Math.random()>0.4?'tree':'hut');
-                for (let i=0; i<8; i++) spawnVehicle('bike');
-            } else if (themeId === 2) { // River
-                ground.material.color.setHex(0x7cb342);
-                const riverMat = new THREE.MeshStandardMaterial({ color: 0x4fc3f7, transparent: true, opacity:0.8 });
-                const river = new THREE.Mesh(new THREE.PlaneGeometry(villageSize, 40), riverMat);
+            currentTheme = themeId; sceneryGroup.clear(); obstacles =[]; vehicles =[];
+            ground.material.color.setHex(themeId === 1 ? 0xba6340 : themeId === 2 ? 0x606c38 : 0x9e9e9e);
+            
+            for (let i=0; i<40; i++) spawnStatic(Math.random()>0.5?'tree':'hut');
+            
+            if(themeId === 2) {
+                const river = new THREE.Mesh(new THREE.PlaneGeometry(villageSize, 40), new THREE.MeshStandardMaterial({ color: 0x4fc3f7, transparent: true, opacity:0.8 }));
                 river.rotation.x = -Math.PI/2; river.position.y = 0.1; sceneryGroup.add(river);
-
-                for(let i=0; i<30; i++) {
-                    const foam = new THREE.Mesh(new THREE.BoxGeometry(1,0.1,1), new THREE.MeshBasicMaterial({color:0xffffff}));
-                    foam.position.set((Math.random()-0.5)*villageSize, 0.15, (Math.random()-0.5)*38);
-                    sceneryGroup.add(foam); riverFoam.push(foam);
-                }
-
-                for (let i=0; i<20; i++) spawnStatic('tree', true);
                 for (let i=0; i<6; i++) spawnVehicle('boat', true);
-            } else if (themeId === 3) { // Street
-                ground.material.color.setHex(0x9e9e9e);
-                for (let i=0; i<40; i++) spawnStatic('hut');
-                for (let i=0; i<10; i++) spawnVehicle('bike');
+            } else {
+                for (let i=0; i<8; i++) spawnVehicle('bike', false);
             }
         }
-
-        function spawnStatic(type, avoidCenter=false) {
+        function spawnStatic(type) {
             let x = (Math.random()-0.5)*120; let z = (Math.random()-0.5)*120;
-            if (avoidCenter && Math.abs(z) < 25) z += (z>0? 25:-25);
             if (Math.abs(x) < 15) x += (x>0? 15:-15); 
             const mesh = createModel(type); mesh.position.set(x, 0, z);
-            sceneryGroup.add(mesh); obstacles.push({x:x, z:z, radius: type==='tree'?2:5});
+            sceneryGroup.add(mesh); obstacles.push({x:x, z:z, radius: 3});
         }
-
         function spawnVehicle(type, nearRiver=false) {
-            let x = (Math.random()-0.5)*100; 
-            let z = nearRiver ? (Math.random()-0.5)*30 : (Math.random()-0.5)*100;
+            let x = (Math.random()-0.5)*100; let z = nearRiver ? (Math.random()-0.5)*30 : (Math.random()-0.5)*100;
             const mesh = createModel(type); mesh.position.set(x, 0.5, z);
             sceneryGroup.add(mesh); vehicles.push({type:type, mesh:mesh});
         }
-
-        function checkCollision(x, z, radius) {
+        function checkCollision(x, z, r) {
             if (Math.abs(x) > villageSize/2 || Math.abs(z) > villageSize/2) return true;
-            for (let obs of obstacles) {
-                if (Math.hypot(x - obs.x, z - obs.z) < (radius + obs.radius)) return true;
-            } return false;
+            for (let obs of obstacles) if (Math.hypot(x - obs.x, z - obs.z) < (r + obs.radius)) return true; return false;
         }
 
-        // ==========================================
-        // 4. NEW HUMANOID ENTITIES & ANIMATIONS
-        // ==========================================
-        function createHumanoid(clothingColor, skinColor) {
-            const group = new THREE.Group();
-            
-            const matCloth = new THREE.MeshStandardMaterial({color: clothingColor});
-            const matSkin = new THREE.MeshStandardMaterial({color: skinColor});
+        // ================== HUMANOIDS & VEHICLE EQUIP ==================
+        function createHumanoid(clothColor, skinColor, isPlayer = false) {
+            const group = new THREE.Group(); 
+            const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2, 1), new THREE.MeshStandardMaterial({color: clothColor})); 
+            body.position.y = 1.5; body.castShadow = true;
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.6), new THREE.MeshStandardMaterial({color: skinColor}));
+            head.position.y = 3.1; head.castShadow = true;
+            group.add(body, head); 
 
-            // Torso
-            const torso = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.5, 0.8), matCloth);
-            torso.position.y = 2.2; torso.castShadow = true;
+            // Add the glowing tracking ring under the player
+            if (isPlayer) {
+                const markerGeo = new THREE.RingGeometry(1.2, 1.6, 32);
+                const markerMat = new THREE.MeshBasicMaterial({color: 0x00ff00, transparent: true, opacity: 0.8, side: THREE.DoubleSide});
+                const marker = new THREE.Mesh(markerGeo, markerMat);
+                marker.rotation.x = -Math.PI / 2;
+                marker.position.y = 0.2; // Keep slightly above ground to prevent clipping
+                group.add(marker);
+            }
 
-            // Head
-            const head = new THREE.Mesh(new THREE.SphereGeometry(0.6, 16, 16), matSkin);
-            head.position.y = 3.5; head.castShadow = true;
-
-            // Limbs
-            const armGeo = new THREE.BoxGeometry(0.4, 1.2, 0.4);
-            const legGeo = new THREE.BoxGeometry(0.5, 1.5, 0.5);
-
-            const leftArm = new THREE.Mesh(armGeo, matSkin);
-            leftArm.position.set(-0.8, 2.2, 0); leftArm.castShadow = true;
-            const rightArm = new THREE.Mesh(armGeo, matSkin);
-            rightArm.position.set(0.8, 2.2, 0); rightArm.castShadow = true;
-
-            const leftLeg = new THREE.Mesh(legGeo, matCloth);
-            leftLeg.position.set(-0.35, 0.75, 0); leftLeg.castShadow = true;
-            const rightLeg = new THREE.Mesh(legGeo, matCloth);
-            rightLeg.position.set(0.35, 0.75, 0); rightLeg.castShadow = true;
-
-            group.add(torso, head, leftArm, rightArm, leftLeg, rightLeg);
-            
-            group.userData = { 
-                leftArm, rightArm, leftLeg, rightLeg, 
-                vehicle: null, vMesh: null 
-            };
+            group.userData = { vehicle: null, vMesh: null }; 
             return group;
         }
 
-        let playerMesh = createHumanoid(0x0077b6, 0xf5cab3); scene.add(playerMesh);
-        let brideMesh = createHumanoid(0xd90429, 0xf5cab3); scene.add(brideMesh);
-        let enemies = [];
+        // The Thief (Player) is now wearing dark stealth clothing and has a tracking ring
+        let playerMesh = createHumanoid(0x22223b, 0x8d5524, true); 
+        scene.add(playerMesh);
 
-        function animateHumanoid(character, speed, time) {
-            const data = character.userData;
-            if(data.vehicle === 'bike') {
-                // Pedaling on bike
-                data.leftLeg.rotation.x = Math.sin(time * 10) * 0.5;
-                data.rightLeg.rotation.x = Math.sin(time * 10 + Math.PI) * 0.5;
-                data.leftArm.rotation.x = -0.5; data.rightArm.rotation.x = -0.5;
-            } else if (data.vehicle === 'boat') {
-                // Sitting in boat
-                data.leftLeg.rotation.x = -1.2; data.rightLeg.rotation.x = -1.2;
-                data.leftArm.rotation.x = Math.sin(time * 3) * 0.3; 
-                data.rightArm.rotation.x = Math.sin(time * 3) * 0.3;
-            } else if (speed > 0.01) {
-                // Running
-                const cycle = time * 15;
-                data.leftArm.rotation.x = Math.sin(cycle) * 0.8;
-                data.rightArm.rotation.x = Math.sin(cycle + Math.PI) * 0.8;
-                data.leftLeg.rotation.x = Math.sin(cycle + Math.PI) * 0.8;
-                data.rightLeg.rotation.x = Math.sin(cycle) * 0.8;
-            } else {
-                // Idle
-                data.leftArm.rotation.x = 0; data.rightArm.rotation.x = 0;
-                data.leftLeg.rotation.x = 0; data.rightLeg.rotation.x = 0;
-            }
-        }
+        // The Bohu (Bride)
+        let brideMesh = createHumanoid(0xd90429, 0x8d5524); 
+        scene.add(brideMesh);
+        
+        let enemies = []; let speechBubbles =[];
 
-        let speechBubbles =[];
         function showSpeech(mesh, text) {
-            const div = document.createElement('div');
-            div.className = 'speech-bubble'; div.innerText = text;
-            document.body.appendChild(div);
-            speechBubbles.push({ mesh: mesh, element: div, timer: 2.0 });
+            const div = document.createElement('div'); div.className = 'speech-bubble'; div.innerText = text;
+            document.body.appendChild(div); speechBubbles.push({ mesh: mesh, element: div, timer: 1.5 });
         }
 
         function equipVehicle(entity, vType) {
             if(entity.userData.vMesh) entity.remove(entity.userData.vMesh);
             entity.userData.vehicle = vType;
-            entity.userData.vMesh = vType ? createModel(vType) : null;
+            if(!vType) { entity.userData.vMesh = null; return; }
+            entity.userData.vMesh = createModel(vType);
             if(vType === 'bike') entity.userData.vMesh.position.set(0, -0.5, 0); 
-            if(vType === 'boat') entity.userData.vMesh.position.set(0, 0, 0); 
-            if(vType) entity.add(entity.userData.vMesh);
+            if(vType === 'boat') entity.userData.vMesh.position.set(0, -0.5, 0); 
+            entity.add(entity.userData.vMesh);
         }
 
-        // ==========================================
-        // 5. GAME LOGIC
-        // ==========================================
+        // ================== GAME LOGIC ==================
         let isPlaying = false; let lives = 3; let timeLeft = 180; let hasBohu = false;
+        let stamina = 100; const maxStamina = 100;
 
         function startGame(themeId) {
             document.getElementById("main-menu").style.display = "none";
             document.getElementById("ui-layer").style.display = "flex";
+            document.getElementById("stamina-container").style.display = "block";
             document.getElementById("ingame-instructions").style.display = "block";
-            
-            // Show joystick on mobile automatically
-            if(isMobile) document.getElementById("joystick-container").style.display = "block";
+            if(isMobile) { document.getElementById("joystick-container").style.display = "block"; document.getElementById("dash-btn").style.display = "flex"; }
             
             loadTheme(themeId);
             
-            playerMesh.position.set(0, 0, villageSize/2 - 5);
-            equipVehicle(playerMesh, null); 
-            
-            brideMesh.position.set(0, 0, -villageSize/2 + 5);
-            brideMesh.visible = true; hasBohu = false;
+            // Set Player Position
+            playerMesh.position.set(0, 0, villageSize/2 - 5); 
+            equipVehicle(playerMesh, null);
+
+            // INSTANT CAMERA LOCK FIX
+            // Instantly snap the camera behind the player before the game loop starts
+            camera.position.set(playerMesh.position.x, 28, playerMesh.position.z + 32);
+            camera.lookAt(playerMesh.position);
+
+            brideMesh.position.set(0, 0, -villageSize/2 + 5); brideMesh.visible = true; hasBohu = false;
             if(playerMesh.getObjectByName("brideIcon")) playerMesh.remove(playerMesh.getObjectByName("brideIcon"));
 
             enemies.forEach(e => scene.remove(e.mesh)); enemies =[];
             for(let i=0; i<4; i++) {
-                let mesh = createHumanoid(0x264653, 0xe76f51);
+                let mesh = createHumanoid(0xffca28, 0x8d5524); // Enemies in Mustard Yellow
                 mesh.position.set((Math.random()-0.5)*40, 0, (Math.random()-0.5)*40);
-                scene.add(mesh); enemies.push({mesh:mesh, speed:12});
+                scene.add(mesh); 
+                enemies.push({mesh:mesh, speed:12, role: i}); 
             }
-
-            lives = 3; timeLeft = 180; isPlaying = true;
-            document.getElementById("status-display").innerText = "Tag the Bride!";
-            updateUI(); playSound('pickup');
-            setTimeout(() => showSpeech(playerMesh, "I'm coming for you!"), 1000);
+            lives = 3; timeLeft = 180; stamina = 100; isPlaying = true; updateUI();
+            setTimeout(() => showSpeech(playerMesh, "Let's grab the Bohu!"), 1000);
         }
 
         function updateUI() {
             document.getElementById("lives-display").innerText = `Lives: ${lives}`;
             document.getElementById("timer-display").innerText = `Time: ${timeLeft}`;
         }
-
-        setInterval(() => {
-            if(isPlaying && timeLeft > 0) {
-                timeLeft--; updateUI();
-                if(timeLeft <= 0) gameOver(false);
-                
-                if(timeLeft % 8 === 0 && enemies.length > 0) {
-                    showSpeech(enemies[Math.floor(Math.random()*enemies.length)].mesh, "Stop right there!");
-                }
-            }
-        }, 1000);
+        setInterval(() => { if(isPlaying && timeLeft > 0) { timeLeft--; updateUI(); if(timeLeft <= 0) gameOver(false); } }, 1000);
 
         function gameOver(win) {
             isPlaying = false;
-            document.getElementById("ui-layer").style.display = "none";
-            document.getElementById("ingame-instructions").style.display = "none";
-            document.getElementById("joystick-container").style.display = "none";
+            document.getElementById("ui-layer").style.display = "none"; document.getElementById("stamina-container").style.display = "none";
+            document.getElementById("joystick-container").style.display = "none"; document.getElementById("dash-btn").style.display = "none";
             document.getElementById("game-over").style.display = "block";
             document.getElementById("end-title").innerText = win ? "Victory!" : "Game Over!";
-            document.getElementById("end-title").style.color = win ? "#2a9d8f" : "#e76f51";
-            document.getElementById("end-desc").innerText = win ? "You rescued the Bride and escaped!" : "The Warriors caught you.";
+            document.getElementById("end-title").style.color = win ? "#00e5ff" : "#e76f51";
+            document.getElementById("end-desc").innerText = win ? "You rescued the Bohu and escaped!" : "The Warriors caught you.";
             speechBubbles.forEach(b => document.body.removeChild(b.element)); speechBubbles=[];
         }
 
-        // ==========================================
-        // 6. MAIN RENDER LOOP & PHYSICS
-        // ==========================================
+        // ================== RENDER LOOP ==================
         const clock = new THREE.Clock();
 
         function animate() {
-            requestAnimationFrame(animate);
-            const dt = Math.min(clock.getDelta(), 0.1);
-            const time = clock.getElapsedTime();
+            requestAnimationFrame(animate); const dt = Math.min(clock.getDelta(), 0.1);
 
             if (isPlaying) {
-                // Time cycle
-                const sunProg = 1 - (timeLeft / 180);
-                sunLight.position.y = 100 - (sunProg * 120);
-                if (sunProg > 0.6 && sunProg < 0.8) { scene.background.lerp(new THREE.Color(0xf4a261), 0.01); scene.fog.color.lerp(new THREE.Color(0xf4a261), 0.01); }
-                else if (sunProg >= 0.8) { scene.background.lerp(new THREE.Color(0x2b2d42), 0.01); scene.fog.color.lerp(new THREE.Color(0x2b2d42), 0.01); }
+                let activeDash = (keys.Shift || isDashing) && stamina > 0;
+                if(activeDash) stamina = Math.max(0, stamina - 40 * dt);
+                else stamina = Math.min(maxStamina, stamina + 15 * dt);
+                
+                const fill = document.getElementById("stamina-fill");
+                fill.style.width = stamina + "%"; fill.style.backgroundColor = stamina < 20 ? "#e76f51" : "#00e5ff";
 
-                // River Animation
-                riverFoam.forEach(f => { f.position.x -= 5*dt; if(f.position.x < -villageSize/2) f.position.x = villageSize/2; });
-
-                function getTerrainData(entity) {
-                    let inWater = (currentTheme === 2 && Math.abs(entity.position.z) < 20);
-                    let v = entity.userData.vehicle;
-                    if(inWater) {
-                        if(v === 'boat') return { speedMult: 2.0, yOff: 0.5 }; 
-                        if(v === 'bike') return { speedMult: 0.1, yOff: -0.5 }; 
-                        return { speedMult: 0.3, yOff: -0.5 }; 
-                    } else {
-                        if(v === 'bike') return { speedMult: 2.0, yOff: 1 }; 
-                        if(v === 'boat') return { speedMult: 0.2, yOff: 0.5 }; 
-                        return { speedMult: 1.0, yOff: 0 }; 
-                    }
+                let inWater = (currentTheme === 2 && Math.abs(playerMesh.position.z) < 20);
+                
+                if(inWater && playerMesh.userData.vehicle === 'bike') {
+                    equipVehicle(playerMesh, null); showSpeech(playerMesh, "My bike sank!");
+                } else if (!inWater && playerMesh.userData.vehicle === 'boat') {
+                    equipVehicle(playerMesh, null); showSpeech(playerMesh, "Grounded!");
                 }
 
-                // Player Movement
-                let tData = getTerrainData(playerMesh);
-                let moveSpeed = 20 * tData.speedMult * dt;
-                
+                let speedMult = 1;
+                if(inWater) { speedMult = playerMesh.userData.vehicle === 'boat' ? 1.5 : 0.4; } 
+                else { speedMult = playerMesh.userData.vehicle === 'bike' ? 1.8 : 1.0; }
+
+                let moveSpeed = (activeDash ? 35 : 18) * speedMult * dt;
                 let mx = 0, mz = 0;
                 if(keys.w || keys.ArrowUp) mz -= 1; if(keys.s || keys.ArrowDown) mz += 1;
                 if(keys.a || keys.ArrowLeft) mx -= 1; if(keys.d || keys.ArrowRight) mx += 1;
-                
                 if(Math.abs(joyX)>0 || Math.abs(joyZ)>0) { mx = joyX; mz = joyZ; }
                 
-                let isMoving = false;
+                let pVelX = 0, pVelZ = 0;
                 if(mx !== 0 || mz !== 0) {
                     let len = Math.hypot(mx, mz); mx /= len; mz /= len;
-                    if(!checkCollision(playerMesh.position.x + mx*moveSpeed, playerMesh.position.z, 1.5)) playerMesh.position.x += mx*moveSpeed;
-                    if(!checkCollision(playerMesh.position.x, playerMesh.position.z + mz*moveSpeed, 1.5)) playerMesh.position.z += mz*moveSpeed;
+                    pVelX = mx * moveSpeed; pVelZ = mz * moveSpeed;
+                    
+                    if(!checkCollision(playerMesh.position.x + pVelX, playerMesh.position.z, 1.5)) playerMesh.position.x += pVelX;
+                    if(!checkCollision(playerMesh.position.x, playerMesh.position.z + pVelZ, 1.5)) playerMesh.position.z += pVelZ;
                     playerMesh.lookAt(playerMesh.position.x + mx, playerMesh.position.y, playerMesh.position.z + mz);
-                    isMoving = true;
+                    
+                    if(activeDash && Math.random() > 0.5) spawnDust(playerMesh.position.x, 0, playerMesh.position.z);
                 }
+                playerMesh.position.y = (inWater && !playerMesh.userData.vehicle) ? -0.5 : 0;
 
-                playerMesh.position.y = tData.yOff + (tData.speedMult > 0.5 ? Math.abs(Math.sin(time * 15)) * 0.2 : 0);
-                animateHumanoid(playerMesh, isMoving ? moveSpeed : 0, time);
-
-                // Vehicle Pickups
                 for(let i=0; i<vehicles.length; i++) {
-                    let v = vehicles[i];
-                    if(playerMesh.position.distanceTo(v.mesh.position) < 3) {
-                        equipVehicle(playerMesh, v.type); scene.remove(v.mesh); vehicles.splice(i, 1); i--;
-                        playSound('pickup'); showSpeech(playerMesh, v.type==='bike' ? "Vroom!" : "Sailing!");
-                    } else {
-                        enemies.forEach(e => {
-                            if(e.mesh.position.distanceTo(v.mesh.position) < 3) {
-                                equipVehicle(e.mesh, v.type); scene.remove(v.mesh); vehicles.splice(i, 1); i--;
-                                showSpeech(e.mesh, "I got a " + v.type + "!");
-                            }
-                        });
+                    if(playerMesh.position.distanceTo(vehicles[i].mesh.position) < 3) {
+                        equipVehicle(playerMesh, vehicles[i].type); scene.remove(vehicles[i].mesh); vehicles.splice(i, 1); i--;
+                        showSpeech(playerMesh, "Got a ride!");
                     }
                 }
 
-                // Camera Follow
-                camera.position.lerp(new THREE.Vector3(playerMesh.position.x, 25, playerMesh.position.z + 30), 0.1);
+                for(let i=0; i<particles.length; i++) {
+                    let p = particles[i]; p.userData.life -= dt * 2;
+                    p.position.y += dt; p.scale.setScalar(p.userData.life);
+                    if(p.userData.life <= 0) { scene.remove(p); particles.splice(i, 1); i--; }
+                }
+
+                // CAMERA FOLLOW (Smoothed tracking now that the initial snap is fixed)
+                camera.position.lerp(new THREE.Vector3(playerMesh.position.x, 28, playerMesh.position.z + 32), 0.1);
                 camera.lookAt(playerMesh.position);
 
-                // Enemy AI
                 enemies.forEach(e => {
-                    let eData = getTerrainData(e.mesh);
-                    let eSpeed = e.speed * eData.speedMult * dt;
-                    let dx = playerMesh.position.x - e.mesh.position.x;
-                    let dz = playerMesh.position.z - e.mesh.position.z;
+                    let eWater = (currentTheme === 2 && Math.abs(e.mesh.position.z) < 20);
+                    let eSpeed = e.speed * (eWater ? 0.4 : 1.0) * dt;
+
+                    let targetX = playerMesh.position.x;
+                    let targetZ = playerMesh.position.z;
+
+                    if (e.role === 1) { 
+                        targetX += pVelX * 30 + pVelZ * 20; targetZ += pVelZ * 30 - pVelX * 20;
+                    } else if (e.role === 2) { 
+                        targetX += pVelX * 30 - pVelZ * 20; targetZ += pVelZ * 30 + pVelX * 20;
+                    } else if (e.role === 3 && !hasBohu) { 
+                        targetX = brideMesh.position.x; targetZ = brideMesh.position.z + 8;
+                    }
+
+                    if(Math.hypot(targetX - e.mesh.position.x, targetZ - e.mesh.position.z) < 5) {
+                        targetX = playerMesh.position.x; targetZ = playerMesh.position.z;
+                    }
+
+                    let dx = targetX - e.mesh.position.x; let dz = targetZ - e.mesh.position.z;
                     let dist = Math.hypot(dx, dz);
                     
-                    let eMoving = false;
-                    if(dist > 0) {
+                    if(dist > 0.5) {
                         let emx = (dx/dist) * eSpeed; let emz = (dz/dist) * eSpeed;
                         if(!checkCollision(e.mesh.position.x + emx, e.mesh.position.z, 1.5)) e.mesh.position.x += emx;
                         if(!checkCollision(e.mesh.position.x, e.mesh.position.z + emz, 1.5)) e.mesh.position.z += emz;
-                        e.mesh.lookAt(playerMesh.position);
-                        eMoving = true;
+                        e.mesh.lookAt(e.mesh.position.x + emx, e.mesh.position.y, e.mesh.position.z + emz);
                     }
-                    e.mesh.position.y = eData.yOff + (eData.speedMult > 0.5 ? Math.abs(Math.sin(time * 15)) * 0.2 : 0);
-                    animateHumanoid(e.mesh, eMoving ? eSpeed : 0, time);
+                    e.mesh.position.y = eWater ? -0.5 : 0;
 
-                    if(dist < 3) {
-                        playSound('hit'); lives--; updateUI();
+                    if(Math.hypot(playerMesh.position.x - e.mesh.position.x, playerMesh.position.z - e.mesh.position.z) < 3) {
+                        lives--; updateUI();
                         if(lives <= 0) gameOver(false);
-                        else {
-                            playerMesh.position.set(0, 0, villageSize/2 - 5);
-                            e.mesh.position.set((Math.random()-0.5)*40, 0, 0);
-                            equipVehicle(playerMesh, null); 
-                            showSpeech(e.mesh, "Gotcha!");
+                        else { 
+                            playerMesh.position.set(0, 0, villageSize/2 - 5); e.mesh.position.set((Math.random()-0.5)*40, 0, 0); 
+                            equipVehicle(playerMesh, null); showSpeech(e.mesh, "Gotcha!"); 
                         }
                     }
                 });
 
                 if(!hasBohu && playerMesh.position.distanceTo(brideMesh.position) < 4) {
-                    hasBohu = true; brideMesh.visible = false; playSound('pickup');
-                    document.getElementById("status-display").innerText = "Run to the start!";
+                    hasBohu = true; brideMesh.visible = false; showSpeech(playerMesh, "Got her! Run!");
                     const icon = new THREE.Mesh(new THREE.SphereGeometry(1), new THREE.MeshStandardMaterial({color: 0xd90429}));
                     icon.position.set(2, 3, 0); icon.name = "brideIcon"; playerMesh.add(icon);
-                    showSpeech(playerMesh, "Got her! Run!");
+                    document.getElementById("status-display").innerText = "Run back to the start!";
                 }
-                
-                // Bride animation if still standing
-                if(!hasBohu) animateHumanoid(brideMesh, 0, time);
-
                 if(hasBohu && playerMesh.position.z > (villageSize/2 - 20)) gameOver(true);
 
-                // Speech Bubbles
                 const tempV = new THREE.Vector3();
                 for(let i=0; i<speechBubbles.length; i++) {
                     let b = speechBubbles[i]; b.timer -= dt;
                     if(b.timer <= 0) { document.body.removeChild(b.element); speechBubbles.splice(i, 1); i--; continue; }
-                    tempV.copy(b.mesh.position); tempV.y += 6; 
-                    tempV.project(camera);
+                    tempV.copy(b.mesh.position); tempV.y += 4; tempV.project(camera);
                     b.element.style.left = (tempV.x * 0.5 + 0.5) * window.innerWidth + 'px';
                     b.element.style.top = (tempV.y * -0.5 + 0.5) * window.innerHeight + 'px';
                 }
             }
             renderer.render(scene, camera);
         }
-
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-
+        window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
         animate();
     </script>
 </body>
