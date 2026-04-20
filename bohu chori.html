@@ -3,44 +3,69 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Bohu Chori - Multiverse Village</title>
+    <title>3D Bohu Chori - The Ultimate Chase</title>
     <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; font-family: 'Baloo 2', cursive; background: #000; }
+        body { margin: 0; overflow: hidden; font-family: 'Baloo 2', cursive; background: #000; touch-action: none; }
         canvas { display: block; }
         
+        /* Top UI */
         #ui-layer {
             position: absolute; top: 0; left: 0; width: 100%;
             display: flex; justify-content: space-between; align-items: center;
             padding: 10px 20px; box-sizing: border-box;
             font-size: 24px; font-weight: bold; color: #fff;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.8); pointer-events: none; z-index: 10;
-            display: none; /* Hidden until game starts */
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.9); pointer-events: none; z-index: 10; display: none;
         }
-        #ui-layer span, #ui-layer button { pointer-events: auto; }
-        
-        button {
-            background-color: #e76f51; color: white; border: none;
-            padding: 10px 20px; font-size: 20px; font-family: 'Baloo 2', cursive;
-            border-radius: 8px; cursor: pointer; box-shadow: 0 4px #c44536; transition: 0.1s;
-            margin: 5px;
-        }
-        button:active { transform: translateY(4px); box-shadow: 0 0px #c44536; }
-        .btn-green { background-color: #2a9d8f; box-shadow: 0 4px #1f7a6f; }
-        .btn-green:active { box-shadow: 0 0px #1f7a6f; }
-        .btn-blue { background-color: #0077b6; box-shadow: 0 4px #005f8e; }
-        .btn-blue:active { box-shadow: 0 0px #005f8e; }
 
+        /* Persistent In-Game Instructions */
+        #ingame-instructions {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.6); padding: 10px 20px; border-radius: 30px;
+            color: #fff; font-size: 16px; text-align: center; border: 2px solid #2a9d8f;
+            text-shadow: 1px 1px 2px #000; pointer-events: none; z-index: 10; display: none; width: 90%; max-width: 600px;
+        }
+        
+        /* Modals & Buttons */
         .overlay-card {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             background: rgba(255, 255, 255, 0.95); padding: 30px 40px; border-radius: 20px;
-            text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            z-index: 20; border: 4px solid #2a9d8f; color: #264653; width: 80%; max-width: 500px;
+            text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.6); z-index: 20;
+            border: 4px solid #2a9d8f; color: #264653; width: 85%; max-width: 500px;
         }
-        #game-over { border-color: #e76f51; display: none; }
+        button {
+            background-color: #e76f51; color: white; border: none; padding: 12px 20px;
+            font-size: 20px; font-family: 'Baloo 2', cursive; border-radius: 8px; cursor: pointer;
+            box-shadow: 0 4px #c44536; transition: 0.1s; margin: 5px; width: 100%;
+        }
+        button:active { transform: translateY(4px); box-shadow: 0 0px #c44536; }
+        .btn-green { background-color: #2a9d8f; box-shadow: 0 4px #1f7a6f; }
+        .btn-blue { background-color: #0077b6; box-shadow: 0 4px #005f8e; }
         h1, h2 { color: #d90429; margin-top: 0; }
-        .theme-container { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+        
+        /* Virtual Joystick */
+        #joystick-container {
+            position: absolute; bottom: 80px; left: 40px; width: 120px; height: 120px;
+            background: rgba(255,255,255,0.2); border: 2px solid rgba(255,255,255,0.5);
+            border-radius: 50%; z-index: 15; touch-action: none; display: none;
+        }
+        #joystick-knob {
+            position: absolute; top: 30px; left: 30px; width: 60px; height: 60px;
+            background: rgba(231, 111, 81, 0.8); border-radius: 50%; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+
+        /* 3D Speech Bubbles */
+        .speech-bubble {
+            position: absolute; background: white; border: 2px solid #264653; border-radius: 15px;
+            padding: 5px 10px; font-size: 14px; font-weight: bold; color: #264653;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3); pointer-events: none; z-index: 5;
+            transform: translate(-50%, -100%); white-space: nowrap; transition: opacity 0.3s;
+        }
+        .speech-bubble::after {
+            content: ''; position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%);
+            border-width: 8px 8px 0; border-style: solid; border-color: white transparent transparent transparent;
+        }
     </style>
 </head>
 <body>
@@ -48,22 +73,31 @@
     <div id="ui-layer">
         <span id="lives-display">Lives: 3</span>
         <span id="status-display">Tag the Bride!</span>
-        <span id="timer-display">Time: 60 (Day)</span>
+        <span id="timer-display">Time: 180</span>
     </div>
 
-    <!-- MAIN MENU: Theme Selection -->
+    <!-- Live Instructions Bar -->
+    <div id="ingame-instructions">
+        🎮 <b>PC:</b> WASD/Arrows | 📱 <b>Mobile:</b> Touch screen for Joystick<br>
+        🚲 <b>Bikes:</b> Fast on land! | 🛶 <b>Boats:</b> Cross rivers safely!
+    </div>
+
+    <!-- Virtual Joystick -->
+    <div id="joystick-container">
+        <div id="joystick-knob"></div>
+    </div>
+
+    <!-- Main Menu -->
     <div id="main-menu" class="overlay-card">
-        <h2>Bohu Chori 3D</h2>
+        <h2>Bohu Chori 3D (Multiverse)</h2>
         <p>Select your environment:</p>
-        <div class="theme-container">
-            <button class="btn-green" onclick="startGame(1)">🌳 1. Jungle Village (Carts & Shops)</button>
-            <button class="btn-blue" onclick="startGame(2)">🌊 2. River & Boats</button>
-            <button onclick="startGame(3)">🚲 3. Street & Bicycles</button>
-        </div>
+        <button class="btn-green" onclick="startGame(1)">🌳 1. Jungle Village</button>
+        <button class="btn-blue" onclick="startGame(2)">🌊 2. River & Boats</button>
+        <button onclick="startGame(3)">🚲 3. Street Chase</button>
     </div>
 
-    <!-- GAME OVER SCREEN -->
-    <div id="game-over" class="overlay-card">
+    <!-- Game Over -->
+    <div id="game-over" class="overlay-card" style="display:none;">
         <h1 id="end-title">Game Over!</h1>
         <p id="end-desc">The Warriors caught you.</p>
         <button onclick="document.getElementById('game-over').style.display='none'; document.getElementById('main-menu').style.display='block';">Main Menu</button>
@@ -71,36 +105,44 @@
 
     <script>
         // ==========================================
-        // 1. AUDIO ENGINE
+        // 1. VIRTUAL JOYSTICK & INPUT
         // ==========================================
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        let audioCtx;
-        function initAudio() {
-            if (!audioCtx) audioCtx = new AudioContext();
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-        }
-        function playSound(type) {
-            if (!audioCtx) return;
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain); gain.connect(audioCtx.destination);
-            const now = audioCtx.currentTime;
+        let joyX = 0, joyZ = 0;
+        const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
+        
+        window.addEventListener("keydown", (e) => { if(keys.hasOwnProperty(e.key)) keys[e.key] = true; });
+        window.addEventListener("keyup", (e) => { if(keys.hasOwnProperty(e.key)) keys[e.key] = false; });
+
+        const joyZone = document.getElementById("joystick-container");
+        const joyKnob = document.getElementById("joystick-knob");
+        let dragging = false;
+
+        document.addEventListener("touchstart", () => { if(isPlaying) joyZone.style.display = "block"; }, {once:true}); // Show joystick on touch
+
+        joyZone.addEventListener("pointerdown", (e) => { dragging = true; updateJoystick(e); });
+        window.addEventListener("pointermove", (e) => { if (dragging) updateJoystick(e); });
+        window.addEventListener("pointerup", () => {
+            dragging = false; joyX = 0; joyZ = 0;
+            joyKnob.style.transform = `translate(0px, 0px)`;
+        });
+
+        function updateJoystick(e) {
+            const rect = joyZone.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            let dx = e.clientX - centerX;
+            let dy = e.clientY - centerY;
+            const distance = Math.min(Math.sqrt(dx*dx + dy*dy), 30);
+            const angle = Math.atan2(dy, dx);
             
-            if (type === 'hit') {
-                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, now);
-                osc.frequency.exponentialRampToValueAtTime(40, now + 0.3);
-                gain.gain.setValueAtTime(0.3, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
-                osc.start(now); osc.stop(now + 0.3);
-            } else if (type === 'rescue') {
-                osc.type = 'sine'; osc.frequency.setValueAtTime(400, now);
-                osc.frequency.setValueAtTime(800, now + 0.2);
-                gain.gain.setValueAtTime(0.3, now); gain.gain.linearRampToValueAtTime(0, now + 0.4);
-                osc.start(now); osc.stop(now + 0.4);
-            }
+            joyX = (distance / 30) * Math.cos(angle);
+            joyZ = (distance / 30) * Math.sin(angle);
+            
+            joyKnob.style.transform = `translate(${Math.cos(angle) * distance}px, ${Math.sin(angle) * distance}px)`;
         }
 
         // ==========================================
-        // 2. THREE.JS ENGINE & LIGHTING
+        // 2. AUDIO & THREE.JS ENGINE SETUP
         // ==========================================
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x87CEEB);
@@ -113,221 +155,184 @@
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         document.body.appendChild(renderer.domElement);
 
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
-        scene.add(ambientLight);
-
+        scene.add(new THREE.AmbientLight(0xffffff, 0.5));
         const sunLight = new THREE.DirectionalLight(0xfffaed, 0.8);
         sunLight.castShadow = true;
         sunLight.shadow.mapSize.width = 2048; sunLight.shadow.mapSize.height = 2048;
-        const d = 80;
-        sunLight.shadow.camera.left = -d; sunLight.shadow.camera.right = d;
-        sunLight.shadow.camera.top = d; sunLight.shadow.camera.bottom = -d;
+        sunLight.shadow.camera.left = -80; sunLight.shadow.camera.right = 80;
+        sunLight.shadow.camera.top = 80; sunLight.shadow.camera.bottom = -80;
         scene.add(sunLight);
 
-        // ==========================================
-        // 3. PROCEDURAL BUILDERS & COLLISION ARRAY
-        // ==========================================
-        const villageSize = 120;
-        let obstacles =[]; // { x, z, radius, mesh }
-        let sceneryGroup = new THREE.Group();
-        scene.add(sceneryGroup);
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+        function playSound(type) {
+            if (!audioCtx) { audioCtx = new AudioContext(); audioCtx.resume(); }
+            const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+            
+            if (type === 'hit') {
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, now); osc.frequency.exponentialRampToValueAtTime(40, now+0.3);
+                gain.gain.setValueAtTime(0.3, now); gain.gain.exponentialRampToValueAtTime(0.01, now+0.3); osc.start(now); osc.stop(now+0.3);
+            } else if (type === 'pickup') {
+                osc.type = 'square'; osc.frequency.setValueAtTime(600, now); osc.frequency.setValueAtTime(900, now+0.1);
+                gain.gain.setValueAtTime(0.2, now); gain.gain.linearRampToValueAtTime(0, now+0.2); osc.start(now); osc.stop(now+0.2);
+            }
+        }
 
+        // ==========================================
+        // 3. BUILDERS, COLLISIONS & THEMES
+        // ==========================================
+        const villageSize = 140;
+        let currentTheme = 1;
+        let obstacles =[]; 
+        let vehicles =[]; // Rideable Pickups
+        let riverFoam =[]; // Particles for river
+
+        let sceneryGroup = new THREE.Group(); scene.add(sceneryGroup);
         const ground = new THREE.Mesh(new THREE.PlaneGeometry(villageSize, villageSize), new THREE.MeshStandardMaterial({ color: 0xe9c46a }));
-        ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true;
-        scene.add(ground);
+        ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
 
-        // Reusable Geometries & Materials
-        const woodMat = new THREE.MeshStandardMaterial({ color: 0x5c4033 });
-        const leafMat = new THREE.MeshStandardMaterial({ color: 0x2a9d8f });
-        const wallMat = new THREE.MeshStandardMaterial({ color: 0xf4a261 });
-        const roofMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b });
-        const wheelMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
-
-        function addObstacle(mesh, x, z, radius) {
-            mesh.position.set(x, 0, z);
-            sceneryGroup.add(mesh);
-            obstacles.push({ x: x, z: z, radius: radius });
-        }
-
-        // --- Model Builders ---
-        function createHut() {
+        function createModel(type) {
             const group = new THREE.Group();
-            const hut = new THREE.Mesh(new THREE.BoxGeometry(8, 6, 8), wallMat); hut.position.y = 3; hut.castShadow = true;
-            const roof = new THREE.Mesh(new THREE.ConeGeometry(6, 5, 4), roofMat); roof.position.y = 8.5; roof.rotation.y = Math.PI/4; roof.castShadow = true;
-            group.add(hut, roof); return group;
+            if (type === 'tree') {
+                const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 1, 6), new THREE.MeshStandardMaterial({color: 0x5c4033})); trunk.position.y = 3; trunk.castShadow=true;
+                const leaves = new THREE.Mesh(new THREE.SphereGeometry(4, 8, 8), new THREE.MeshStandardMaterial({color: 0x2a9d8f})); leaves.position.y = 7; leaves.castShadow=true;
+                group.add(trunk, leaves);
+            } else if (type === 'hut') {
+                const hut = new THREE.Mesh(new THREE.BoxGeometry(8, 6, 8), new THREE.MeshStandardMaterial({color: 0xf4a261})); hut.position.y = 3; hut.castShadow=true;
+                const roof = new THREE.Mesh(new THREE.ConeGeometry(6, 5, 4), new THREE.MeshStandardMaterial({color: 0x8b5a2b})); roof.position.y=8.5; roof.rotation.y=Math.PI/4; roof.castShadow=true;
+                group.add(hut, roof);
+            } else if (type === 'bike') {
+                const wGeo = new THREE.TorusGeometry(1, 0.1, 8, 16); const wMat = new THREE.MeshStandardMaterial({color:0x333});
+                const w1 = new THREE.Mesh(wGeo, wMat); w1.position.set(0, 1, -2); w1.castShadow=true;
+                const w2 = new THREE.Mesh(wGeo, wMat); w2.position.set(0, 1, 2); w2.castShadow=true;
+                const frame = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 4), new THREE.MeshStandardMaterial({color:0xd90429})); frame.position.set(0, 1.5, 0); frame.castShadow=true;
+                group.add(w1, w2, frame); group.scale.set(0.8,0.8,0.8);
+            } else if (type === 'boat') {
+                const hull = new THREE.Mesh(new THREE.BoxGeometry(4, 2, 8), new THREE.MeshStandardMaterial({color: 0x5c4033})); hull.position.y=1; hull.castShadow=true;
+                group.add(hull); group.scale.set(0.9,0.9,0.9);
+            }
+            return group;
         }
 
-        function createTree() {
-            const group = new THREE.Group();
-            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 1, 6), woodMat); trunk.position.y = 3; trunk.castShadow = true;
-            const leaves = new THREE.Mesh(new THREE.SphereGeometry(4, 8, 8), leafMat); leaves.position.y = 7; leaves.castShadow = true;
-            group.add(trunk, leaves); return group;
-        }
-
-        function createBullockCart() {
-            const group = new THREE.Group();
-            const body = new THREE.Mesh(new THREE.BoxGeometry(4, 1, 6), woodMat); body.position.y = 2.5; body.castShadow = true;
-            const wGeo = new THREE.CylinderGeometry(1.5, 1.5, 0.5, 16);
-            const w1 = new THREE.Mesh(wGeo, wheelMat); w1.rotation.z = Math.PI/2; w1.position.set(-2.5, 1.5, 0); w1.castShadow = true;
-            const w2 = new THREE.Mesh(wGeo, wheelMat); w2.rotation.z = Math.PI/2; w2.position.set(2.5, 1.5, 0); w2.castShadow = true;
-            const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 5), woodMat); pole.rotation.x = Math.PI/2; pole.position.set(0, 2.5, 4); pole.castShadow=true;
-            group.add(body, w1, w2, pole); return group;
-        }
-
-        function createShop() {
-            const group = new THREE.Group();
-            const base = new THREE.Mesh(new THREE.BoxGeometry(10, 4, 6), wallMat); base.position.y = 2; base.castShadow = true;
-            const counter = new THREE.Mesh(new THREE.BoxGeometry(10, 1, 2), new THREE.MeshStandardMaterial({color:0xd4a373})); counter.position.set(0, 2.5, 4); counter.castShadow=true;
-            const tent = new THREE.Mesh(new THREE.BoxGeometry(12, 1, 8), new THREE.MeshStandardMaterial({color:0xe76f51})); tent.position.set(0, 5, 2); tent.rotation.x=0.2; tent.castShadow=true;
-            group.add(base, counter, tent); return group;
-        }
-
-        function createBoat() {
-            const group = new THREE.Group();
-            const hull = new THREE.Mesh(new THREE.BoxGeometry(4, 2, 10), woodMat); hull.position.y = 0.5; hull.castShadow = true;
-            const seat = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.5, 2), wallMat); seat.position.y = 1.5; seat.castShadow=true;
-            group.add(hull, seat); return group;
-        }
-
-        function createBicycle() {
-            const group = new THREE.Group();
-            const wGeo = new THREE.TorusGeometry(1, 0.1, 8, 16);
-            const w1 = new THREE.Mesh(wGeo, wheelMat); w1.position.set(0, 1, -2); w1.castShadow=true;
-            const w2 = new THREE.Mesh(wGeo, wheelMat); w2.position.set(0, 1, 2); w2.castShadow=true;
-            const frame = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 4), new THREE.MeshStandardMaterial({color:0xd90429})); frame.position.set(0, 1.5, 0); frame.castShadow=true;
-            const handlebars = new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.1, 2), wheelMat); handlebars.rotation.z = Math.PI/2; handlebars.position.set(0, 2.5, 2); handlebars.castShadow=true;
-            group.add(w1, w2, frame, handlebars); group.rotation.y = Math.random() * Math.PI; return group;
-        }
-
-        // ==========================================
-        // 4. THEME GENERATION LOGIC
-        // ==========================================
         function loadTheme(themeId) {
-            // Clear old theme
-            for(let i=sceneryGroup.children.length-1; i>=0; i--) sceneryGroup.remove(sceneryGroup.children[i]);
-            obstacles =[];
+            currentTheme = themeId;
+            sceneryGroup.clear(); obstacles =[]; vehicles =[]; riverFoam =[];
 
-            if (themeId === 1) {
-                // Theme 1: Jungle & Village
-                ground.material.color.setHex(0xe9c46a); // Dusty yellow
-                for (let i = 0; i < 35; i++) {
-                    let x = (Math.random() - 0.5) * 100; let z = (Math.random() - 0.5) * 100;
-                    if (Math.abs(x) < 15) x += (x > 0 ? 15 : -15); // Clear center lane
-                    
-                    let type = Math.random();
-                    if (type < 0.4) addObstacle(createTree(), x, z, 2);
-                    else if (type < 0.7) addObstacle(createHut(), x, z, 5);
-                    else if (type < 0.85) addObstacle(createShop(), x, z, 6);
-                    else addObstacle(createBullockCart(), x, z, 4);
-                }
-            } 
-            else if (themeId === 2) {
-                // Theme 2: River & Boats
-                ground.material.color.setHex(0x7cb342); // Grass green
+            if (themeId === 1) { // Jungle
+                ground.material.color.setHex(0xe9c46a);
+                for (let i=0; i<40; i++) spawnStatic(Math.random()>0.4?'tree':'hut');
+                for (let i=0; i<8; i++) spawnVehicle('bike');
+            } else if (themeId === 2) { // River
+                ground.material.color.setHex(0x7cb342);
                 
-                // The River (Visual)
-                const river = new THREE.Mesh(new THREE.PlaneGeometry(villageSize, 20), new THREE.MeshStandardMaterial({ color: 0x4fc3f7, transparent: true, opacity:0.8 }));
-                river.rotation.x = -Math.PI / 2; river.position.y = 0.2;
-                sceneryGroup.add(river);
+                // Realistic River Mesh
+                const riverMat = new THREE.MeshStandardMaterial({ color: 0x4fc3f7, transparent: true, opacity:0.8 });
+                const river = new THREE.Mesh(new THREE.PlaneGeometry(villageSize, 40), riverMat);
+                river.rotation.x = -Math.PI/2; river.position.y = 0.1; sceneryGroup.add(river);
 
-                // Add obstacles around river
-                for (let i = 0; i < 20; i++) {
-                    let x = (Math.random() - 0.5) * 100; let z = (Math.random() - 0.5) * 100;
-                    if (Math.abs(z) < 15) continue; // Keep out of river
-                    addObstacle(Math.random() > 0.5 ? createTree() : createHut(), x, z, Math.random()>0.5? 2:5);
+                // River Foam Particles
+                for(let i=0; i<30; i++) {
+                    const foam = new THREE.Mesh(new THREE.BoxGeometry(1,0.1,1), new THREE.MeshBasicMaterial({color:0xffffff}));
+                    foam.position.set((Math.random()-0.5)*villageSize, 0.15, (Math.random()-0.5)*38);
+                    sceneryGroup.add(foam); riverFoam.push(foam);
                 }
-                // Add Boats IN the river as physical obstacles
-                for (let i = 0; i < 4; i++) {
-                    addObstacle(createBoat(), (Math.random() - 0.5) * 80, (Math.random() - 0.5) * 10, 5);
-                }
-            }
-            else if (themeId === 3) {
-                // Theme 3: Street & Bicycles
-                ground.material.color.setHex(0x9e9e9e); // Concrete Grey
-                for (let i = 0; i < 40; i++) {
-                    let x = (Math.random() - 0.5) * 100; let z = (Math.random() - 0.5) * 100;
-                    if (Math.abs(x) < 10) x += (x > 0 ? 10 : -10); // Clear road
-                    
-                    let type = Math.random();
-                    if (type < 0.5) addObstacle(createShop(), x, z, 6); // More shops/buildings
-                    else if (type < 0.8) addObstacle(createTree(), x, z, 2);
-                    else addObstacle(createBicycle(), x, z, 2.5);
-                }
+
+                for (let i=0; i<20; i++) spawnStatic('tree', true); // Keep off river
+                for (let i=0; i<6; i++) spawnVehicle('boat', true); // Spawn near/in river
+            } else if (themeId === 3) { // Street
+                ground.material.color.setHex(0x9e9e9e);
+                for (let i=0; i<40; i++) spawnStatic('hut');
+                for (let i=0; i<10; i++) spawnVehicle('bike');
             }
         }
 
+        function spawnStatic(type, avoidCenter=false) {
+            let x = (Math.random()-0.5)*120; let z = (Math.random()-0.5)*120;
+            if (avoidCenter && Math.abs(z) < 25) z += (z>0? 25:-25);
+            if (Math.abs(x) < 15) x += (x>0? 15:-15); // Clear middle lane
+            const mesh = createModel(type); mesh.position.set(x, 0, z);
+            sceneryGroup.add(mesh); obstacles.push({x:x, z:z, radius: type==='tree'?2:5});
+        }
+
+        function spawnVehicle(type, nearRiver=false) {
+            let x = (Math.random()-0.5)*100; 
+            let z = nearRiver ? (Math.random()-0.5)*30 : (Math.random()-0.5)*100;
+            const mesh = createModel(type); mesh.position.set(x, 0.5, z);
+            sceneryGroup.add(mesh); vehicles.push({type:type, mesh:mesh});
+        }
+
+        function checkCollision(x, z, radius) {
+            if (Math.abs(x) > villageSize/2 || Math.abs(z) > villageSize/2) return true;
+            for (let obs of obstacles) {
+                if (Math.hypot(x - obs.x, z - obs.z) < (radius + obs.radius)) return true;
+            } return false;
+        }
+
         // ==========================================
-        // 5. CHARACTERS & COLLISION PHYSICS
+        // 4. ENTITIES, VEHICLE MOUNTING & CONVERSATIONS
         // ==========================================
-        function createCharacter(bodyColor, headColor, hasStick = false) {
+        function createCharacter(bodyColor, headColor) {
             const group = new THREE.Group();
-            const body = new THREE.Mesh(new THREE.CylinderGeometry(1, 1.5, 3), new THREE.MeshStandardMaterial({ color: bodyColor })); body.position.y = 1.5; body.castShadow = true;
-            const head = new THREE.Mesh(new THREE.SphereGeometry(1.2), new THREE.MeshStandardMaterial({ color: headColor })); head.position.y = 3.7; head.castShadow = true;
-            group.add(body, head);
-            if (hasStick) {
-                const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 5), woodMat);
-                stick.position.set(1.5, 2.5, 1); stick.rotation.x = Math.PI / 4; stick.castShadow = true; group.add(stick);
-            }
+            const body = new THREE.Mesh(new THREE.CylinderGeometry(1, 1.5, 3), new THREE.MeshStandardMaterial({color: bodyColor})); body.position.y=1.5; body.castShadow=true;
+            const head = new THREE.Mesh(new THREE.SphereGeometry(1.2), new THREE.MeshStandardMaterial({color: headColor})); head.position.y=3.7; head.castShadow=true;
+            group.add(body, head); group.userData = { vehicle: null, vMesh: null };
             return group;
         }
 
         let playerMesh = createCharacter(0x0077b6, 0xf5cab3); scene.add(playerMesh);
         let brideMesh = createCharacter(0xd90429, 0xf5cab3); scene.add(brideMesh);
-        let enemies =[];
+        let enemies = [];
 
-        function spawnEnemies(count) {
-            enemies.forEach(e => scene.remove(e.mesh));
-            enemies =[];
-            for (let i = 0; i < count; i++) {
-                let mesh = createCharacter(0x264653, 0xe76f51, true);
-                mesh.position.set((Math.random() - 0.5) * 40, 0, (Math.random() - 0.5) * 40);
-                scene.add(mesh);
-                enemies.push({ mesh: mesh, speed: 10 });
-            }
+        // Conversations System
+        let speechBubbles =[];
+        function showSpeech(mesh, text) {
+            const div = document.createElement('div');
+            div.className = 'speech-bubble'; div.innerText = text;
+            document.body.appendChild(div);
+            speechBubbles.push({ mesh: mesh, element: div, timer: 2.0 });
         }
 
-        // --- Custom Physics Engine ---
-        function checkCollision(targetX, targetZ, radius) {
-            // Check boundaries
-            if (Math.abs(targetX) > villageSize/2 || Math.abs(targetZ) > villageSize/2) return true;
-            // Check obstacles (Circle-based collision)
-            for (let obs of obstacles) {
-                let dx = targetX - obs.x;
-                let dz = targetZ - obs.z;
-                if (Math.sqrt(dx*dx + dz*dz) < (radius + obs.radius)) return true;
-            }
-            return false;
+        function equipVehicle(entity, vType) {
+            if(entity.userData.vMesh) entity.remove(entity.userData.vMesh); // Remove old
+            entity.userData.vehicle = vType;
+            entity.userData.vMesh = createModel(vType);
+            if(vType === 'bike') entity.userData.vMesh.position.set(0, -1, 0); // Ride on top
+            if(vType === 'boat') entity.userData.vMesh.position.set(0, -0.5, 0); // Sit inside
+            entity.add(entity.userData.vMesh);
         }
 
         // ==========================================
-        // 6. GAME LOGIC & CONTROLS
+        // 5. GAME LOGIC
         // ==========================================
-        let isPlaying = false;
-        let lives = 3; let timeLeft = 60; let hasBohu = false;
-        const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
-        
-        window.addEventListener("keydown", (e) => { if(keys.hasOwnProperty(e.key)) keys[e.key] = true; });
-        window.addEventListener("keyup", (e) => { if(keys.hasOwnProperty(e.key)) keys[e.key] = false; });
+        let isPlaying = false; let lives = 3; let timeLeft = 180; let hasBohu = false;
 
         function startGame(themeId) {
-            initAudio();
             document.getElementById("main-menu").style.display = "none";
             document.getElementById("ui-layer").style.display = "flex";
+            document.getElementById("ingame-instructions").style.display = "block";
             
             loadTheme(themeId);
             
             playerMesh.position.set(0, 0, villageSize/2 - 5);
+            equipVehicle(playerMesh, null); // Clear vehicles
+            
             brideMesh.position.set(0, 0, -villageSize/2 + 5);
             brideMesh.visible = true; hasBohu = false;
-            
             if(playerMesh.getObjectByName("brideIcon")) playerMesh.remove(playerMesh.getObjectByName("brideIcon"));
 
-            lives = 3; timeLeft = 60; spawnEnemies(4);
-            sunLight.position.set(50, 100, 20); 
-            scene.fog.color.setHex(0x87CEEB); scene.background.setHex(0x87CEEB);
+            enemies.forEach(e => scene.remove(e.mesh)); enemies =[];
+            for(let i=0; i<4; i++) {
+                let mesh = createCharacter(0x264653, 0xe76f51);
+                mesh.position.set((Math.random()-0.5)*40, 0, (Math.random()-0.5)*40);
+                scene.add(mesh); enemies.push({mesh:mesh, speed:12});
+            }
 
-            updateUI();
-            isPlaying = true;
+            lives = 3; timeLeft = 180; isPlaying = true;
+            document.getElementById("status-display").innerText = "Tag the Bride!";
+            updateUI(); playSound('pickup');
+            setTimeout(() => showSpeech(playerMesh, "I'm coming for you!"), 1000);
         }
 
         function updateUI() {
@@ -336,108 +341,164 @@
         }
 
         setInterval(() => {
-            if (isPlaying && timeLeft > 0) {
+            if(isPlaying && timeLeft > 0) {
                 timeLeft--; updateUI();
-                if (timeLeft <= 0) { isPlaying = false; showGameOver(false); }
+                if(timeLeft <= 0) gameOver(false);
+                
+                // Random Enemy Taunts
+                if(timeLeft % 8 === 0 && enemies.length > 0) {
+                    showSpeech(enemies[Math.floor(Math.random()*enemies.length)].mesh, "Stop right there!");
+                }
             }
         }, 1000);
 
-        function showGameOver(win) {
+        function gameOver(win) {
+            isPlaying = false;
             document.getElementById("ui-layer").style.display = "none";
+            document.getElementById("ingame-instructions").style.display = "none";
+            document.getElementById("joystick-container").style.display = "none";
             document.getElementById("game-over").style.display = "block";
             document.getElementById("end-title").innerText = win ? "Victory!" : "Game Over!";
             document.getElementById("end-title").style.color = win ? "#2a9d8f" : "#e76f51";
-            document.getElementById("end-desc").innerText = win ? "You rescued the Bride!" : "Caught by the Warriors!";
+            document.getElementById("end-desc").innerText = win ? "You rescued the Bride and escaped!" : "The Warriors caught you.";
+            speechBubbles.forEach(b => document.body.removeChild(b.element)); speechBubbles=[];
         }
 
         // ==========================================
-        // 7. MAIN GAME LOOP
+        // 6. MAIN RENDER LOOP & PHYSICS
         // ==========================================
         const clock = new THREE.Clock();
 
         function animate() {
             requestAnimationFrame(animate);
-            const dt = Math.min(clock.getDelta(), 0.1); // Cap delta time
+            const dt = Math.min(clock.getDelta(), 0.1);
 
             if (isPlaying) {
-                // --- Day/Night 4D Logic ---
-                const sunProgress = 1 - (timeLeft / 60); 
-                sunLight.position.y = 100 - (sunProgress * 120); 
-                sunLight.intensity = Math.max(0.1, 0.8 - sunProgress * 0.7);
-                if (sunProgress > 0.5 && sunProgress < 0.8) {
-                    scene.background.lerp(new THREE.Color(0xf4a261), 0.01); scene.fog.color.lerp(new THREE.Color(0xf4a261), 0.01);
-                } else if (sunProgress >= 0.8) {
-                    scene.background.lerp(new THREE.Color(0x2b2d42), 0.01); scene.fog.color.lerp(new THREE.Color(0x2b2d42), 0.01);
+                // 4D Time cycle (180s = Noon to Night)
+                const sunProg = 1 - (timeLeft / 180);
+                sunLight.position.y = 100 - (sunProg * 120);
+                if (sunProg > 0.6 && sunProg < 0.8) { scene.background.lerp(new THREE.Color(0xf4a261), 0.01); scene.fog.color.lerp(new THREE.Color(0xf4a261), 0.01); }
+                else if (sunProg >= 0.8) { scene.background.lerp(new THREE.Color(0x2b2d42), 0.01); scene.fog.color.lerp(new THREE.Color(0x2b2d42), 0.01); }
+
+                // River Animation
+                riverFoam.forEach(f => { f.position.x -= 5*dt; if(f.position.x < -villageSize/2) f.position.x = villageSize/2; });
+
+                // Multiplier based on terrain & vehicles
+                function getTerrainData(entity) {
+                    let inWater = (currentTheme === 2 && Math.abs(entity.position.z) < 20);
+                    let v = entity.userData.vehicle;
+                    if(inWater) {
+                        if(v === 'boat') return { speedMult: 2.0, yOff: -0.2 }; // Fast boat
+                        if(v === 'bike') return { speedMult: 0.1, yOff: -1.0 }; // Bike sinking
+                        return { speedMult: 0.3, yOff: -1.5 }; // Swimming/Sinking
+                    } else {
+                        if(v === 'bike') return { speedMult: 2.0, yOff: 0 }; // Fast bike
+                        if(v === 'boat') return { speedMult: 0.2, yOff: 0 }; // Dragging boat
+                        return { speedMult: 1.0, yOff: 0 }; // Running
+                    }
                 }
 
-                // --- Player Movement with Collision Sliding ---
-                const moveSpeed = 20 * dt;
-                let moveX = 0, moveZ = 0;
-                if (keys.w || keys.ArrowUp) moveZ -= moveSpeed;
-                if (keys.s || keys.ArrowDown) moveZ += moveSpeed;
-                if (keys.a || keys.ArrowLeft) moveX -= moveSpeed;
-                if (keys.d || keys.ArrowRight) moveX += moveSpeed;
-
-                // Move X axis independently (Slide against walls)
-                if (moveX !== 0 && !checkCollision(playerMesh.position.x + moveX, playerMesh.position.z, 1.5)) {
-                    playerMesh.position.x += moveX;
+                // --- Player Movement ---
+                let tData = getTerrainData(playerMesh);
+                let moveSpeed = 20 * tData.speedMult * dt;
+                
+                let mx = 0, mz = 0;
+                if(keys.w || keys.ArrowUp) mz -= 1; if(keys.s || keys.ArrowDown) mz += 1;
+                if(keys.a || keys.ArrowLeft) mx -= 1; if(keys.d || keys.ArrowRight) mx += 1;
+                
+                // Apply Joystick if active
+                if(Math.abs(joyX)>0 || Math.abs(joyZ)>0) { mx = joyX; mz = joyZ; }
+                
+                // Normalize & Move
+                if(mx !== 0 || mz !== 0) {
+                    let len = Math.hypot(mx, mz); mx /= len; mz /= len;
+                    if(!checkCollision(playerMesh.position.x + mx*moveSpeed, playerMesh.position.z, 1.5)) playerMesh.position.x += mx*moveSpeed;
+                    if(!checkCollision(playerMesh.position.x, playerMesh.position.z + mz*moveSpeed, 1.5)) playerMesh.position.z += mz*moveSpeed;
+                    playerMesh.lookAt(playerMesh.position.x + mx, playerMesh.position.y, playerMesh.position.z + mz);
                 }
-                // Move Z axis independently (Slide against walls)
-                if (moveZ !== 0 && !checkCollision(playerMesh.position.x, playerMesh.position.z + moveZ, 1.5)) {
-                    playerMesh.position.z += moveZ;
+
+                // Bobbing / Sinking animation
+                playerMesh.position.y = tData.yOff + (tData.speedMult > 0.5 ? Math.abs(Math.sin(clock.elapsedTime * 15)) * 0.5 : 0);
+
+                // --- Vehicle Pickups ---
+                for(let i=0; i<vehicles.length; i++) {
+                    let v = vehicles[i];
+                    if(playerMesh.position.distanceTo(v.mesh.position) < 3) {
+                        equipVehicle(playerMesh, v.type); scene.remove(v.mesh); vehicles.splice(i, 1); i--;
+                        playSound('pickup'); showSpeech(playerMesh, v.type==='bike' ? "Vroom!" : "Sailing!");
+                    } else {
+                        // Enemies can also pick up vehicles!
+                        enemies.forEach(e => {
+                            if(e.mesh.position.distanceTo(v.mesh.position) < 3) {
+                                equipVehicle(e.mesh, v.type); scene.remove(v.mesh); vehicles.splice(i, 1); i--;
+                                showSpeech(e.mesh, "I got a " + v.type + "!");
+                            }
+                        });
+                    }
                 }
 
-                playerMesh.position.y = Math.abs(Math.sin(clock.elapsedTime * 15)) * 0.5; // Running Bob
-
-                // --- Camera Follow ---
+                // Camera Follow
                 camera.position.lerp(new THREE.Vector3(playerMesh.position.x, 25, playerMesh.position.z + 30), 0.1);
                 camera.lookAt(playerMesh.position);
 
-                // --- Enemy AI (Seek & Avoid Obstacles) ---
-                enemies.forEach(enemy => {
-                    let dx = playerMesh.position.x - enemy.mesh.position.x;
-                    let dz = playerMesh.position.z - enemy.mesh.position.z;
-                    let dist = Math.sqrt(dx*dx + dz*dz);
+                // --- Enemy AI ---
+                enemies.forEach(e => {
+                    let eData = getTerrainData(e.mesh);
+                    let eSpeed = e.speed * eData.speedMult * dt;
+                    let dx = playerMesh.position.x - e.mesh.position.x;
+                    let dz = playerMesh.position.z - e.mesh.position.z;
+                    let dist = Math.hypot(dx, dz);
                     
-                    if (dist > 0) {
-                        let eMoveX = (dx/dist) * enemy.speed * dt;
-                        let eMoveZ = (dz/dist) * enemy.speed * dt;
-
-                        // Enemies also respect collision! (They slide against walls)
-                        if (!checkCollision(enemy.mesh.position.x + eMoveX, enemy.mesh.position.z, 1.5)) enemy.mesh.position.x += eMoveX;
-                        if (!checkCollision(enemy.mesh.position.x, enemy.mesh.position.z + eMoveZ, 1.5)) enemy.mesh.position.z += eMoveZ;
-                        enemy.mesh.lookAt(playerMesh.position);
+                    if(dist > 0) {
+                        let emx = (dx/dist) * eSpeed; let emz = (dz/dist) * eSpeed;
+                        if(!checkCollision(e.mesh.position.x + emx, e.mesh.position.z, 1.5)) e.mesh.position.x += emx;
+                        if(!checkCollision(e.mesh.position.x, e.mesh.position.z + emz, 1.5)) e.mesh.position.z += emz;
+                        e.mesh.lookAt(playerMesh.position);
                     }
+                    e.mesh.position.y = eData.yOff + (eData.speedMult > 0.5 ? Math.abs(Math.sin(clock.elapsedTime * 15)) * 0.5 : 0);
 
-                    // Catching Player
-                    if (dist < 3) {
+                    // Catch Player
+                    if(dist < 3) {
                         playSound('hit'); lives--; updateUI();
-                        if (lives <= 0) { isPlaying = false; showGameOver(false); } 
+                        if(lives <= 0) gameOver(false);
                         else {
                             playerMesh.position.set(0, 0, villageSize/2 - 5);
-                            enemy.mesh.position.set((Math.random() - 0.5) * 40, 0, 0);
+                            e.mesh.position.set((Math.random()-0.5)*40, 0, 0);
+                            equipVehicle(playerMesh, null); // Lose vehicle on hit
+                            showSpeech(e.mesh, "Gotcha!");
                         }
                     }
                 });
 
-                // --- Gameplay Logic ---
-                if (!hasBohu && playerMesh.position.distanceTo(brideMesh.position) < 4) {
-                    hasBohu = true; brideMesh.visible = false; playSound('rescue');
+                // --- Logic: Tag Bride ---
+                if(!hasBohu && playerMesh.position.distanceTo(brideMesh.position) < 4) {
+                    hasBohu = true; brideMesh.visible = false; playSound('pickup');
                     document.getElementById("status-display").innerText = "Run to the start!";
                     const icon = new THREE.Mesh(new THREE.SphereGeometry(1), new THREE.MeshStandardMaterial({color: 0xd90429}));
                     icon.position.set(2, 3, 0); icon.name = "brideIcon"; playerMesh.add(icon);
+                    showSpeech(playerMesh, "Got her! Run!");
                 }
 
-                if (hasBohu && playerMesh.position.z > (villageSize/2 - 20)) {
-                    isPlaying = false; showGameOver(true);
+                // Win Condition
+                if(hasBohu && playerMesh.position.z > (villageSize/2 - 20)) gameOver(true);
+
+                // --- Speech Bubbles Projection ---
+                const tempV = new THREE.Vector3();
+                for(let i=0; i<speechBubbles.length; i++) {
+                    let b = speechBubbles[i]; b.timer -= dt;
+                    if(b.timer <= 0) { document.body.removeChild(b.element); speechBubbles.splice(i, 1); i--; continue; }
+                    
+                    tempV.copy(b.mesh.position); tempV.y += 6; // Float above head
+                    tempV.project(camera);
+                    b.element.style.left = (tempV.x * 0.5 + 0.5) * window.innerWidth + 'px';
+                    b.element.style.top = (tempV.y * -0.5 + 0.5) * window.innerHeight + 'px';
                 }
             }
             renderer.render(scene, camera);
         }
 
         window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
+            camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
