@@ -2,12 +2,21 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>3D Bohu Chori - The Ultimate Chase</title>
     <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; font-family: 'Baloo 2', cursive; background: #000; touch-action: none; }
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            font-family: 'Baloo 2', cursive; 
+            background: #000; 
+            /* Crucial for mobile games: prevents pull-to-refresh and swipe navigation */
+            touch-action: none; 
+            -webkit-user-select: none; 
+            user-select: none; 
+        }
         canvas { display: block; }
         
         /* Top UI */
@@ -46,13 +55,14 @@
         
         /* Virtual Joystick */
         #joystick-container {
-            position: absolute; bottom: 80px; left: 40px; width: 120px; height: 120px;
+            position: absolute; bottom: 50px; left: 30px; width: 120px; height: 120px;
             background: rgba(255,255,255,0.2); border: 2px solid rgba(255,255,255,0.5);
             border-radius: 50%; z-index: 15; touch-action: none; display: none;
         }
         #joystick-knob {
             position: absolute; top: 30px; left: 30px; width: 60px; height: 60px;
             background: rgba(231, 111, 81, 0.8); border-radius: 50%; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            pointer-events: none; /* Let container handle events */
         }
 
         /* 3D Speech Bubbles */
@@ -76,27 +86,23 @@
         <span id="timer-display">Time: 180</span>
     </div>
 
-    <!-- Live Instructions Bar -->
     <div id="ingame-instructions">
-        🎮 <b>PC:</b> WASD/Arrows | 📱 <b>Mobile:</b> Touch screen for Joystick<br>
+        🎮 <b>PC:</b> WASD/Arrows | 📱 <b>Mobile:</b> Use the Joystick<br>
         🚲 <b>Bikes:</b> Fast on land! | 🛶 <b>Boats:</b> Cross rivers safely!
     </div>
 
-    <!-- Virtual Joystick -->
     <div id="joystick-container">
         <div id="joystick-knob"></div>
     </div>
 
-    <!-- Main Menu -->
     <div id="main-menu" class="overlay-card">
-        <h2>Bohu Chori 3D (Multiverse)</h2>
+        <h2>Bohu Chori 3D</h2>
         <p>Select your environment:</p>
         <button class="btn-green" onclick="startGame(1)">🌳 1. Jungle Village</button>
         <button class="btn-blue" onclick="startGame(2)">🌊 2. River & Boats</button>
         <button onclick="startGame(3)">🚲 3. Street Chase</button>
     </div>
 
-    <!-- Game Over -->
     <div id="game-over" class="overlay-card" style="display:none;">
         <h1 id="end-title">Game Over!</h1>
         <p id="end-desc">The Warriors caught you.</p>
@@ -105,7 +111,7 @@
 
     <script>
         // ==========================================
-        // 1. VIRTUAL JOYSTICK & INPUT
+        // 1. IMPROVED MOBILE JOYSTICK & INPUT
         // ==========================================
         let joyX = 0, joyZ = 0;
         const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
@@ -117,21 +123,17 @@
         const joyKnob = document.getElementById("joystick-knob");
         let dragging = false;
 
-        document.addEventListener("touchstart", () => { if(isPlaying) joyZone.style.display = "block"; }, {once:true}); // Show joystick on touch
+        // Check if device is likely mobile
+        const isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (window.innerWidth <= 768);
 
-        joyZone.addEventListener("pointerdown", (e) => { dragging = true; updateJoystick(e); });
-        window.addEventListener("pointermove", (e) => { if (dragging) updateJoystick(e); });
-        window.addEventListener("pointerup", () => {
-            dragging = false; joyX = 0; joyZ = 0;
-            joyKnob.style.transform = `translate(0px, 0px)`;
-        });
-
-        function updateJoystick(e) {
+        function handleTouch(e) {
+            e.preventDefault(); // Prevent scrolling
+            const touch = e.touches[0] || e.changedTouches[0];
             const rect = joyZone.getBoundingClientRect();
             const centerX = rect.left + rect.width / 2;
             const centerY = rect.top + rect.height / 2;
-            let dx = e.clientX - centerX;
-            let dy = e.clientY - centerY;
+            let dx = touch.clientX - centerX;
+            let dy = touch.clientY - centerY;
             const distance = Math.min(Math.sqrt(dx*dx + dy*dy), 30);
             const angle = Math.atan2(dy, dx);
             
@@ -140,6 +142,14 @@
             
             joyKnob.style.transform = `translate(${Math.cos(angle) * distance}px, ${Math.sin(angle) * distance}px)`;
         }
+
+        joyZone.addEventListener("touchstart", (e) => { dragging = true; handleTouch(e); }, {passive: false});
+        joyZone.addEventListener("touchmove", (e) => { if(dragging) handleTouch(e); }, {passive: false});
+        joyZone.addEventListener("touchend", (e) => { 
+            e.preventDefault(); 
+            dragging = false; joyX = 0; joyZ = 0; 
+            joyKnob.style.transform = `translate(0px, 0px)`; 
+        }, {passive: false});
 
         // ==========================================
         // 2. AUDIO & THREE.JS ENGINE SETUP
@@ -155,10 +165,10 @@
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         document.body.appendChild(renderer.domElement);
 
-        scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.6));
         const sunLight = new THREE.DirectionalLight(0xfffaed, 0.8);
         sunLight.castShadow = true;
-        sunLight.shadow.mapSize.width = 2048; sunLight.shadow.mapSize.height = 2048;
+        sunLight.shadow.mapSize.width = 1024; sunLight.shadow.mapSize.height = 1024;
         sunLight.shadow.camera.left = -80; sunLight.shadow.camera.right = 80;
         sunLight.shadow.camera.top = 80; sunLight.shadow.camera.bottom = -80;
         scene.add(sunLight);
@@ -186,8 +196,8 @@
         const villageSize = 140;
         let currentTheme = 1;
         let obstacles =[]; 
-        let vehicles =[]; // Rideable Pickups
-        let riverFoam =[]; // Particles for river
+        let vehicles =[]; 
+        let riverFoam =[]; 
 
         let sceneryGroup = new THREE.Group(); scene.add(sceneryGroup);
         const ground = new THREE.Mesh(new THREE.PlaneGeometry(villageSize, villageSize), new THREE.MeshStandardMaterial({ color: 0xe9c46a }));
@@ -226,21 +236,18 @@
                 for (let i=0; i<8; i++) spawnVehicle('bike');
             } else if (themeId === 2) { // River
                 ground.material.color.setHex(0x7cb342);
-                
-                // Realistic River Mesh
                 const riverMat = new THREE.MeshStandardMaterial({ color: 0x4fc3f7, transparent: true, opacity:0.8 });
                 const river = new THREE.Mesh(new THREE.PlaneGeometry(villageSize, 40), riverMat);
                 river.rotation.x = -Math.PI/2; river.position.y = 0.1; sceneryGroup.add(river);
 
-                // River Foam Particles
                 for(let i=0; i<30; i++) {
                     const foam = new THREE.Mesh(new THREE.BoxGeometry(1,0.1,1), new THREE.MeshBasicMaterial({color:0xffffff}));
                     foam.position.set((Math.random()-0.5)*villageSize, 0.15, (Math.random()-0.5)*38);
                     sceneryGroup.add(foam); riverFoam.push(foam);
                 }
 
-                for (let i=0; i<20; i++) spawnStatic('tree', true); // Keep off river
-                for (let i=0; i<6; i++) spawnVehicle('boat', true); // Spawn near/in river
+                for (let i=0; i<20; i++) spawnStatic('tree', true);
+                for (let i=0; i<6; i++) spawnVehicle('boat', true);
             } else if (themeId === 3) { // Street
                 ground.material.color.setHex(0x9e9e9e);
                 for (let i=0; i<40; i++) spawnStatic('hut');
@@ -251,7 +258,7 @@
         function spawnStatic(type, avoidCenter=false) {
             let x = (Math.random()-0.5)*120; let z = (Math.random()-0.5)*120;
             if (avoidCenter && Math.abs(z) < 25) z += (z>0? 25:-25);
-            if (Math.abs(x) < 15) x += (x>0? 15:-15); // Clear middle lane
+            if (Math.abs(x) < 15) x += (x>0? 15:-15); 
             const mesh = createModel(type); mesh.position.set(x, 0, z);
             sceneryGroup.add(mesh); obstacles.push({x:x, z:z, radius: type==='tree'?2:5});
         }
@@ -271,21 +278,75 @@
         }
 
         // ==========================================
-        // 4. ENTITIES, VEHICLE MOUNTING & CONVERSATIONS
+        // 4. NEW HUMANOID ENTITIES & ANIMATIONS
         // ==========================================
-        function createCharacter(bodyColor, headColor) {
+        function createHumanoid(clothingColor, skinColor) {
             const group = new THREE.Group();
-            const body = new THREE.Mesh(new THREE.CylinderGeometry(1, 1.5, 3), new THREE.MeshStandardMaterial({color: bodyColor})); body.position.y=1.5; body.castShadow=true;
-            const head = new THREE.Mesh(new THREE.SphereGeometry(1.2), new THREE.MeshStandardMaterial({color: headColor})); head.position.y=3.7; head.castShadow=true;
-            group.add(body, head); group.userData = { vehicle: null, vMesh: null };
+            
+            const matCloth = new THREE.MeshStandardMaterial({color: clothingColor});
+            const matSkin = new THREE.MeshStandardMaterial({color: skinColor});
+
+            // Torso
+            const torso = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.5, 0.8), matCloth);
+            torso.position.y = 2.2; torso.castShadow = true;
+
+            // Head
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.6, 16, 16), matSkin);
+            head.position.y = 3.5; head.castShadow = true;
+
+            // Limbs
+            const armGeo = new THREE.BoxGeometry(0.4, 1.2, 0.4);
+            const legGeo = new THREE.BoxGeometry(0.5, 1.5, 0.5);
+
+            const leftArm = new THREE.Mesh(armGeo, matSkin);
+            leftArm.position.set(-0.8, 2.2, 0); leftArm.castShadow = true;
+            const rightArm = new THREE.Mesh(armGeo, matSkin);
+            rightArm.position.set(0.8, 2.2, 0); rightArm.castShadow = true;
+
+            const leftLeg = new THREE.Mesh(legGeo, matCloth);
+            leftLeg.position.set(-0.35, 0.75, 0); leftLeg.castShadow = true;
+            const rightLeg = new THREE.Mesh(legGeo, matCloth);
+            rightLeg.position.set(0.35, 0.75, 0); rightLeg.castShadow = true;
+
+            group.add(torso, head, leftArm, rightArm, leftLeg, rightLeg);
+            
+            group.userData = { 
+                leftArm, rightArm, leftLeg, rightLeg, 
+                vehicle: null, vMesh: null 
+            };
             return group;
         }
 
-        let playerMesh = createCharacter(0x0077b6, 0xf5cab3); scene.add(playerMesh);
-        let brideMesh = createCharacter(0xd90429, 0xf5cab3); scene.add(brideMesh);
+        let playerMesh = createHumanoid(0x0077b6, 0xf5cab3); scene.add(playerMesh);
+        let brideMesh = createHumanoid(0xd90429, 0xf5cab3); scene.add(brideMesh);
         let enemies = [];
 
-        // Conversations System
+        function animateHumanoid(character, speed, time) {
+            const data = character.userData;
+            if(data.vehicle === 'bike') {
+                // Pedaling on bike
+                data.leftLeg.rotation.x = Math.sin(time * 10) * 0.5;
+                data.rightLeg.rotation.x = Math.sin(time * 10 + Math.PI) * 0.5;
+                data.leftArm.rotation.x = -0.5; data.rightArm.rotation.x = -0.5;
+            } else if (data.vehicle === 'boat') {
+                // Sitting in boat
+                data.leftLeg.rotation.x = -1.2; data.rightLeg.rotation.x = -1.2;
+                data.leftArm.rotation.x = Math.sin(time * 3) * 0.3; 
+                data.rightArm.rotation.x = Math.sin(time * 3) * 0.3;
+            } else if (speed > 0.01) {
+                // Running
+                const cycle = time * 15;
+                data.leftArm.rotation.x = Math.sin(cycle) * 0.8;
+                data.rightArm.rotation.x = Math.sin(cycle + Math.PI) * 0.8;
+                data.leftLeg.rotation.x = Math.sin(cycle + Math.PI) * 0.8;
+                data.rightLeg.rotation.x = Math.sin(cycle) * 0.8;
+            } else {
+                // Idle
+                data.leftArm.rotation.x = 0; data.rightArm.rotation.x = 0;
+                data.leftLeg.rotation.x = 0; data.rightLeg.rotation.x = 0;
+            }
+        }
+
         let speechBubbles =[];
         function showSpeech(mesh, text) {
             const div = document.createElement('div');
@@ -295,12 +356,12 @@
         }
 
         function equipVehicle(entity, vType) {
-            if(entity.userData.vMesh) entity.remove(entity.userData.vMesh); // Remove old
+            if(entity.userData.vMesh) entity.remove(entity.userData.vMesh);
             entity.userData.vehicle = vType;
-            entity.userData.vMesh = createModel(vType);
-            if(vType === 'bike') entity.userData.vMesh.position.set(0, -1, 0); // Ride on top
-            if(vType === 'boat') entity.userData.vMesh.position.set(0, -0.5, 0); // Sit inside
-            entity.add(entity.userData.vMesh);
+            entity.userData.vMesh = vType ? createModel(vType) : null;
+            if(vType === 'bike') entity.userData.vMesh.position.set(0, -0.5, 0); 
+            if(vType === 'boat') entity.userData.vMesh.position.set(0, 0, 0); 
+            if(vType) entity.add(entity.userData.vMesh);
         }
 
         // ==========================================
@@ -313,10 +374,13 @@
             document.getElementById("ui-layer").style.display = "flex";
             document.getElementById("ingame-instructions").style.display = "block";
             
+            // Show joystick on mobile automatically
+            if(isMobile) document.getElementById("joystick-container").style.display = "block";
+            
             loadTheme(themeId);
             
             playerMesh.position.set(0, 0, villageSize/2 - 5);
-            equipVehicle(playerMesh, null); // Clear vehicles
+            equipVehicle(playerMesh, null); 
             
             brideMesh.position.set(0, 0, -villageSize/2 + 5);
             brideMesh.visible = true; hasBohu = false;
@@ -324,7 +388,7 @@
 
             enemies.forEach(e => scene.remove(e.mesh)); enemies =[];
             for(let i=0; i<4; i++) {
-                let mesh = createCharacter(0x264653, 0xe76f51);
+                let mesh = createHumanoid(0x264653, 0xe76f51);
                 mesh.position.set((Math.random()-0.5)*40, 0, (Math.random()-0.5)*40);
                 scene.add(mesh); enemies.push({mesh:mesh, speed:12});
             }
@@ -345,7 +409,6 @@
                 timeLeft--; updateUI();
                 if(timeLeft <= 0) gameOver(false);
                 
-                // Random Enemy Taunts
                 if(timeLeft % 8 === 0 && enemies.length > 0) {
                     showSpeech(enemies[Math.floor(Math.random()*enemies.length)].mesh, "Stop right there!");
                 }
@@ -372,9 +435,10 @@
         function animate() {
             requestAnimationFrame(animate);
             const dt = Math.min(clock.getDelta(), 0.1);
+            const time = clock.getElapsedTime();
 
             if (isPlaying) {
-                // 4D Time cycle (180s = Noon to Night)
+                // Time cycle
                 const sunProg = 1 - (timeLeft / 180);
                 sunLight.position.y = 100 - (sunProg * 120);
                 if (sunProg > 0.6 && sunProg < 0.8) { scene.background.lerp(new THREE.Color(0xf4a261), 0.01); scene.fog.color.lerp(new THREE.Color(0xf4a261), 0.01); }
@@ -383,22 +447,21 @@
                 // River Animation
                 riverFoam.forEach(f => { f.position.x -= 5*dt; if(f.position.x < -villageSize/2) f.position.x = villageSize/2; });
 
-                // Multiplier based on terrain & vehicles
                 function getTerrainData(entity) {
                     let inWater = (currentTheme === 2 && Math.abs(entity.position.z) < 20);
                     let v = entity.userData.vehicle;
                     if(inWater) {
-                        if(v === 'boat') return { speedMult: 2.0, yOff: -0.2 }; // Fast boat
-                        if(v === 'bike') return { speedMult: 0.1, yOff: -1.0 }; // Bike sinking
-                        return { speedMult: 0.3, yOff: -1.5 }; // Swimming/Sinking
+                        if(v === 'boat') return { speedMult: 2.0, yOff: 0.5 }; 
+                        if(v === 'bike') return { speedMult: 0.1, yOff: -0.5 }; 
+                        return { speedMult: 0.3, yOff: -0.5 }; 
                     } else {
-                        if(v === 'bike') return { speedMult: 2.0, yOff: 0 }; // Fast bike
-                        if(v === 'boat') return { speedMult: 0.2, yOff: 0 }; // Dragging boat
-                        return { speedMult: 1.0, yOff: 0 }; // Running
+                        if(v === 'bike') return { speedMult: 2.0, yOff: 1 }; 
+                        if(v === 'boat') return { speedMult: 0.2, yOff: 0.5 }; 
+                        return { speedMult: 1.0, yOff: 0 }; 
                     }
                 }
 
-                // --- Player Movement ---
+                // Player Movement
                 let tData = getTerrainData(playerMesh);
                 let moveSpeed = 20 * tData.speedMult * dt;
                 
@@ -406,28 +469,27 @@
                 if(keys.w || keys.ArrowUp) mz -= 1; if(keys.s || keys.ArrowDown) mz += 1;
                 if(keys.a || keys.ArrowLeft) mx -= 1; if(keys.d || keys.ArrowRight) mx += 1;
                 
-                // Apply Joystick if active
                 if(Math.abs(joyX)>0 || Math.abs(joyZ)>0) { mx = joyX; mz = joyZ; }
                 
-                // Normalize & Move
+                let isMoving = false;
                 if(mx !== 0 || mz !== 0) {
                     let len = Math.hypot(mx, mz); mx /= len; mz /= len;
                     if(!checkCollision(playerMesh.position.x + mx*moveSpeed, playerMesh.position.z, 1.5)) playerMesh.position.x += mx*moveSpeed;
                     if(!checkCollision(playerMesh.position.x, playerMesh.position.z + mz*moveSpeed, 1.5)) playerMesh.position.z += mz*moveSpeed;
                     playerMesh.lookAt(playerMesh.position.x + mx, playerMesh.position.y, playerMesh.position.z + mz);
+                    isMoving = true;
                 }
 
-                // Bobbing / Sinking animation
-                playerMesh.position.y = tData.yOff + (tData.speedMult > 0.5 ? Math.abs(Math.sin(clock.elapsedTime * 15)) * 0.5 : 0);
+                playerMesh.position.y = tData.yOff + (tData.speedMult > 0.5 ? Math.abs(Math.sin(time * 15)) * 0.2 : 0);
+                animateHumanoid(playerMesh, isMoving ? moveSpeed : 0, time);
 
-                // --- Vehicle Pickups ---
+                // Vehicle Pickups
                 for(let i=0; i<vehicles.length; i++) {
                     let v = vehicles[i];
                     if(playerMesh.position.distanceTo(v.mesh.position) < 3) {
                         equipVehicle(playerMesh, v.type); scene.remove(v.mesh); vehicles.splice(i, 1); i--;
                         playSound('pickup'); showSpeech(playerMesh, v.type==='bike' ? "Vroom!" : "Sailing!");
                     } else {
-                        // Enemies can also pick up vehicles!
                         enemies.forEach(e => {
                             if(e.mesh.position.distanceTo(v.mesh.position) < 3) {
                                 equipVehicle(e.mesh, v.type); scene.remove(v.mesh); vehicles.splice(i, 1); i--;
@@ -441,7 +503,7 @@
                 camera.position.lerp(new THREE.Vector3(playerMesh.position.x, 25, playerMesh.position.z + 30), 0.1);
                 camera.lookAt(playerMesh.position);
 
-                // --- Enemy AI ---
+                // Enemy AI
                 enemies.forEach(e => {
                     let eData = getTerrainData(e.mesh);
                     let eSpeed = e.speed * eData.speedMult * dt;
@@ -449,28 +511,29 @@
                     let dz = playerMesh.position.z - e.mesh.position.z;
                     let dist = Math.hypot(dx, dz);
                     
+                    let eMoving = false;
                     if(dist > 0) {
                         let emx = (dx/dist) * eSpeed; let emz = (dz/dist) * eSpeed;
                         if(!checkCollision(e.mesh.position.x + emx, e.mesh.position.z, 1.5)) e.mesh.position.x += emx;
                         if(!checkCollision(e.mesh.position.x, e.mesh.position.z + emz, 1.5)) e.mesh.position.z += emz;
                         e.mesh.lookAt(playerMesh.position);
+                        eMoving = true;
                     }
-                    e.mesh.position.y = eData.yOff + (eData.speedMult > 0.5 ? Math.abs(Math.sin(clock.elapsedTime * 15)) * 0.5 : 0);
+                    e.mesh.position.y = eData.yOff + (eData.speedMult > 0.5 ? Math.abs(Math.sin(time * 15)) * 0.2 : 0);
+                    animateHumanoid(e.mesh, eMoving ? eSpeed : 0, time);
 
-                    // Catch Player
                     if(dist < 3) {
                         playSound('hit'); lives--; updateUI();
                         if(lives <= 0) gameOver(false);
                         else {
                             playerMesh.position.set(0, 0, villageSize/2 - 5);
                             e.mesh.position.set((Math.random()-0.5)*40, 0, 0);
-                            equipVehicle(playerMesh, null); // Lose vehicle on hit
+                            equipVehicle(playerMesh, null); 
                             showSpeech(e.mesh, "Gotcha!");
                         }
                     }
                 });
 
-                // --- Logic: Tag Bride ---
                 if(!hasBohu && playerMesh.position.distanceTo(brideMesh.position) < 4) {
                     hasBohu = true; brideMesh.visible = false; playSound('pickup');
                     document.getElementById("status-display").innerText = "Run to the start!";
@@ -478,17 +541,18 @@
                     icon.position.set(2, 3, 0); icon.name = "brideIcon"; playerMesh.add(icon);
                     showSpeech(playerMesh, "Got her! Run!");
                 }
+                
+                // Bride animation if still standing
+                if(!hasBohu) animateHumanoid(brideMesh, 0, time);
 
-                // Win Condition
                 if(hasBohu && playerMesh.position.z > (villageSize/2 - 20)) gameOver(true);
 
-                // --- Speech Bubbles Projection ---
+                // Speech Bubbles
                 const tempV = new THREE.Vector3();
                 for(let i=0; i<speechBubbles.length; i++) {
                     let b = speechBubbles[i]; b.timer -= dt;
                     if(b.timer <= 0) { document.body.removeChild(b.element); speechBubbles.splice(i, 1); i--; continue; }
-                    
-                    tempV.copy(b.mesh.position); tempV.y += 6; // Float above head
+                    tempV.copy(b.mesh.position); tempV.y += 6; 
                     tempV.project(camera);
                     b.element.style.left = (tempV.x * 0.5 + 0.5) * window.innerWidth + 'px';
                     b.element.style.top = (tempV.y * -0.5 + 0.5) * window.innerHeight + 'px';
